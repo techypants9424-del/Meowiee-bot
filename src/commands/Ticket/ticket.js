@@ -45,6 +45,12 @@ export default {
                         )
                         .setRequired(false),
                 )
+            .addStringOption((option) =>
+    option
+        .setName("image_link")
+        .setDescription("Direct image URL for the ticket panel.")
+        .setRequired(false),
+)
                 .addChannelOption((option) =>
                     option
                         .setName("category")
@@ -133,6 +139,8 @@ const panelMessage = interaction.options.getString("panel_message") || "Click th
             const buttonLabel =
                 interaction.options.getString("button_label") ||
 "Create Ticket";
+            const imageLink =
+    interaction.options.getString("image_link");
             const maxTicketsPerUser = interaction.options.getInteger("max_tickets_per_user") || 3;
 const dmOnClose = interaction.options.getBoolean("dm_on_close") !== false;
 
@@ -141,6 +149,9 @@ const dmOnClose = interaction.options.getBoolean("dm_on_close") !== false;
 description: panelMessage,
                 color: getColor('info')
             });
+            if (imageLink && imageLink.trim() !== "") {
+    setupEmbed.setImage(imageLink.trim());
+}
 
             const ticketButton = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
