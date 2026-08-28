@@ -172,20 +172,9 @@ export function createMockInteraction(message, commandData, args) {
 }
 
 export function supportsPrefixExecution(command) {
-  if (command.prefixOnly === false || command.slashOnly === true) {
-    return false;
-  }
-
-  const commandName = command.data?.name?.toLowerCase();
-  if (commandName && SLASH_ONLY_COMMANDS.has(commandName)) {
-    return false;
-  }
-
-  if (command.prefixExecute) {
-    return true;
-  }
-
-  return !!command.execute;
+  // Allow all commands to be used without a prefix.
+  // Slash commands continue to work normally.
+  return !!command?.execute || !!command?.prefixExecute;
 }
 
 export async function executePrefixCommand(command, message, args, client, prefixOverride = null, guildConfig = null) {
