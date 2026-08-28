@@ -32,27 +32,35 @@ export default {
 
         const guildId = interaction.guildId;
 
+        if (!guildId) {
+            throw createError(
+                'Balance used outside a server',
+                ErrorTypes.VALIDATION,
+                'This command can only be used inside a server.'
+            );
+        }
+
         const data = await getEconomyData(
             client,
             guildId,
             targetUser.id
         );
 
-      const meowCoins = data.wallet || 0;
+        const meowCoins = data.wallet || 0;
 
-const embed = createEmbed({
-    title: `🐱 ${targetUser.username}'s MeowCoins`,
-    description:
-        `✨ **${meowCoins.toLocaleString()} MeowCoins**\n\n` +
-        `Keep chatting, working, and claiming rewards to earn more!`,
-})
-    .setFooter({
-        text: `Requested by ${interaction.user.tag}`,
-        iconURL: interaction.user.displayAvatarURL(),
-    });
-
-await InteractionHelper.safeEditReply(interaction, {
-    embeds: [embed],
-});
+        const embed = createEmbed({
+            title: `🐱 ${targetUser.username}'s MeowCoins`,
+            description:
+                `✨ **${meowCoins.toLocaleString()} MeowCoins**\n\n` +
+                `Keep chatting, working, and claiming rewards to earn more!`,
+        })
+            .setFooter({
+                text: `Requested by ${interaction.user.tag}`,
+                iconURL: interaction.user.displayAvatarURL(),
             });
+
+        await InteractionHelper.safeEditReply(interaction, {
+            embeds: [embed],
+        });
+    }, { command: 'balance' }),
 };
