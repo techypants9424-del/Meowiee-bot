@@ -1,7 +1,11 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { createEmbed } from '../../utils/embeds.js';
 import { getEconomyData, saveEconomyData } from '../../utils/economy.js';
-import { withErrorHandling, createError, ErrorTypes } from '../../utils/errorHandler.js';
+import {
+    withErrorHandling,
+    createError,
+    ErrorTypes
+} from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
 const COOLDOWN = 24 * 60 * 60 * 1000; // 24 hours
@@ -18,6 +22,7 @@ export default {
         const guildId = interaction.guildId;
         const userId = interaction.user.id;
 
+        // Make sure command is used inside a server
         if (!guildId) {
             throw createError(
                 'Daily used outside a server',
@@ -26,15 +31,23 @@ export default {
             );
         }
 
-        const data = await getEconomyData(client, guildId, userId);
+        // Get user's economy data
+        const data = await getEconomyData(
+            client,
+            guildId,
+            userId
+        );
 
         const now = Date.now();
         const lastDaily = data.lastDaily || 0;
         const timeLeft = COOLDOWN - (now - lastDaily);
 
-        // Still on cooldown
+        // Daily is still on cooldown
         if (timeLeft > 0) {
-            const hours = Math.floor(timeLeft / (60 * 60 * 1000));
+            const hours = Math.floor(
+                timeLeft / (60 * 60 * 1000)
+            );
+
             const minutes = Math.floor(
                 (timeLeft % (60 * 60 * 1000)) / (60 * 1000)
             );
@@ -46,34 +59,50 @@ export default {
                     `Come back in **${hours}h ${minutes}m**.`,
             });
 
-            await InteractionHelper.safeEditReply(interaction, {
-                embeds: [embed],
-            });
+            await InteractionHelper.safeEditReply(
+                interaction,
+                {
+                    embeds: [embed],
+                }
+            );
 
             return;
         }
 
-        // Random reward between 100 and 500
-        const reward = Math.floor(Math.random() * 401) + 100;
+        // Random reward: 100 - 500 MeowCoins
+        const reward =
+            Math.floor(Math.random() * 401) + 100;
 
+        // Add reward to wallet
         data.wallet = (data.wallet || 0) + reward;
+
+        // Save claim time
         data.lastDaily = now;
 
-        await saveEconomyData(client, guildId, userId, data);
+        // Save updated economy data
+        await saveEconomyData(
+            client,
+            guildId,
+            userId,
+            data
+        );
 
+        // Success embed
         const embed = createEmbed({
             title: '🎁 Daily Reward!',
             description:
                 `You claimed your daily reward!\n\n` +
                 `💰 **+${reward.toLocaleString()} MeowCoins**\n\n` +
                 `Your new wallet balance is **$${data.wallet.toLocaleString()}**.`,
-        })
-            .setFooter({
-                text: `Come back tomorrow for another reward!`,
-            });
-
-        await InteractionHelper.safeEditReply(interaction, {
-            embeds: [embed],
+        }).setFooter({
+            text: 'Come back tomorrow for another reward!',
         });
+
+        await InteractionHelper.safeEditReply(
+            interaction,
+            {
+                embeds: [embed],
+            }
+        );
     }, { command: 'daily' }),
 };
