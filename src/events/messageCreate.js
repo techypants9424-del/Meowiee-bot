@@ -47,55 +47,81 @@ export default {
 async function handlePrefixCommand(message, client) {
   try {
     const guildConfig = await getGuildConfig(client, message.guild.id);
-    const prefix = guildConfig?.prefix || getCommandPrefix();
-    const parsed = parsePrefixCommand(message.content, prefix);
-    
-    if (!parsed) {
-      return; 
+
+    // Prefixless command handling:
+    // "help", "ping", "ticket" instead of "!help", "!ping", "!ticket"
+    const content = message.content.trim();
+
+    if (!content) {
+      return;
     }
 
-    let { commandName, args } = parsed;
+    const parts = content.split(/\s+/);
+    let commandName = parts.shift().toLowerCase();
+    let args = parts;
+
+    // Music shortcuts
     const musicPrefixShortcut = commandName.toLowerCase();
-    const MUSIC_PREFIX_SHORTCUTS = new Set(['leave', 'pause', 'resume', 'skip', 'stop', 'volume']);
+    const MUSIC_PREFIX_SHORTCUTS = new Set([
+      'leave',
+      'pause',
+      'resume',
+      'skip',
+      'stop',
+      'volume',
+    ]);
+
     if (MUSIC_PREFIX_SHORTCUTS.has(musicPrefixShortcut)) {
       commandName = 'music';
       args = [musicPrefixShortcut, ...args];
     }
 
-    logger.info(`Prefix command detected: ${commandName}, args: ${args.join(', ')}`);
+    logger.info(
+      `Prefixless command detected: ${commandName}, args: ${args.join(', ')}`
+    );
 
     const resolvedCommandName = resolveCommandAlias(commandName);
     logger.info(`Resolved command name: ${resolvedCommandName}`);
+
     const command = client.commands.get(resolvedCommandName);
 
     if (!command) {
-      logger.warn(`Command not found: ${resolvedCommandName}`);
-      return; 
+      // Not a command — ignore normal messages.
+      return;
     }
 
     if (isMaintenanceMode() && !isBotOwner(message.author.id)) {
       await message.channel.send({
-        embeds: [createEmbed({
-          title: 'Maintenance Mode',
-          description: getBotMessage('maintenanceMode'),
-          color: 'warning',
-        })],
+        embeds: [
+          createEmbed({
+            title: 'Maintenance Mode',
+            description: getBotMessage('maintenanceMode'),
+            color: 'warning',
+          }),
+        ],
       }).catch(() => {});
       return;
     }
 
     if (!isCommandCategoryEnabled(command.category)) {
       await message.channel.send({
-        embeds: [createEmbed({
-          title: 'Feature Disabled',
-          description: getBotMessage('commandDisabled'),
-          color: 'error',
-        })],
+        embeds: [
+          createEmbed({
+            title: 'Feature Disabled',
+            description: getBotMessage('commandDisabled'),
+            color: 'error',
+          }),
+        ],
       }).catch(() => {});
       return;
     }
 
-    const restriction = getPrefixRestriction(command, args, resolveSubcommandAlias);
+    const restriction = getPrefixRestriction(
+      command,
+      args,
+      resolveSubcommandAlias
+    );
+
     if (!supportsPrefixExecution(command) || restriction.blocked) {
       if (restriction.blocked && restriction.reason) {
         const embed = createEmbed({
@@ -103,17 +129,27 @@ async function handlePrefixCommand(message, client) {
           description: `${restriction.reason}\nUse \`/${resolvedCommandName}\` instead.`,
           color: 'info',
         });
+
         await message.channel.send({ embeds: [embed] }).catch(() => {});
       }
+
       return;
     }
 
-    if (!(await isCommandEnabled(client, message.guild.id, resolvePrefixAccessKey(command.data, args), command.category))) {
+    if (
+      !(await isCommandEnabled(
+        client,
+        message.guild.id,
+        resolvePrefixAccessKey(command.data, args),
+        command.category
+      ))
+    ) {
       const embed = createEmbed({
         title: 'Command Disabled',
         description: 'This command has been disabled for this server.',
         color: 'error',
       });
+
       await message.channel.send({ embeds: [embed] }).catch(() => {});
       return;
     }
@@ -122,27 +158,43 @@ async function handlePrefixCommand(message, client) {
       guildId: message.guild.id,
       user: message.author,
     };
+
     const abuseProtection = await enforceAbuseProtection(
       mockInteractionForProtection,
       command,
-      resolvedCommandName,
+      resolvedCommandName
     );
+
     if (!abuseProtection.allowed) {
-      const formattedCooldown = formatCooldownDuration(abuseProtection.remainingMs);
+      const formattedCooldown = formatCooldownDuration(
+        abuseProtection.remainingMs
+      );
+
       const embed = createEmbed({
         title: 'Command Cooldown',
         description: `This command is on cooldown. Please wait ${formattedCooldown} before trying again.`,
         color: 'error',
       });
+
       await message.channel.send({ embeds: [embed] }).catch(() => {});
       return;
     }
 
-    logger.info(`Executing prefix command: ${prefix}${commandName} (resolved to ${resolvedCommandName}) by ${message.author.tag}`);
-    
-    await executePrefixCommand(command, message, args, client, prefix, guildConfig);
+    logger.info(
+      `Executing prefixless command: ${commandName} (resolved to ${resolvedCommandName}) by ${message.author.tag}`
+    );
+
+    // Empty prefix because commands are now prefixless.
+    await executePrefixCommand(
+      command,
+      message,
+      args,
+      client,
+      '',
+      guildConfig
+    );
   } catch (error) {
-    logger.error('Error handling prefix command:', error);
+    logger.error('Error handling prefixless command:', error);
   }
 }
 
