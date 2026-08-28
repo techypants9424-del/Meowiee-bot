@@ -38,31 +38,21 @@ export default {
             targetUser.id
         );
 
-        const wallet = data.wallet || 0;
+      const meowCoins = data.wallet || 0;
 
-        const embed = createEmbed({
-            title: `🐱 ${targetUser.username}'s MeowCoins`,
-            description: `Here is the current MeowCoins balance for ${targetUser.username}.`,
-        })
-            .addFields(
-                {
-                    name: '🐾 MeowCoins',
-                    value: `**${wallet.toLocaleString()}**`,
-                    inline: true,
-                },
-                {
-                    name: '💰 Total',
-                    value: `**${wallet.toLocaleString()} MeowCoins**`,
-                    inline: true,
-                }
-            )
-            .setFooter({
-                text: `Requested by ${interaction.user.tag}`,
-                iconURL: interaction.user.displayAvatarURL(),
+const embed = createEmbed({
+    title: `🐱 ${targetUser.username}'s MeowCoins`,
+    description:
+        `✨ **${meowCoins.toLocaleString()} MeowCoins**\n\n` +
+        `Keep chatting, working, and claiming rewards to earn more!`,
+})
+    .setFooter({
+        text: `Requested by ${interaction.user.tag}`,
+        iconURL: interaction.user.displayAvatarURL(),
+    });
+
+await InteractionHelper.safeEditReply(interaction, {
+    embeds: [embed],
+});
             });
-
-        await InteractionHelper.safeEditReply(interaction, {
-            embeds: [embed],
-        });
-    }, { command: 'balance' }),
 };
