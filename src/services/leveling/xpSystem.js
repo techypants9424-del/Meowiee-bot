@@ -109,6 +109,7 @@ async function awardRoleReward(guild, member, roleId, level) {
   }
 }
 
+```js
 async function sendLevelUpAnnouncement(guild, member, levelData, config) {
   try {
     const levelUpChannel = config.levelUpChannel
@@ -136,14 +137,18 @@ async function sendLevelUpAnnouncement(guild, member, levelData, config) {
       embeds: [
         {
           image: {
-            url: 'https://i.pinimg.com/736x/10/07/c0/1007c0e5bb52b066b0051db73c1d8498.jpg',
+            url: 'https://static2.klipy.com/ii/d7aec6f6f171607374b2065c836f92f4/e5/4e/UQb39ZQj.gif',
           },
         },
       ],
     }).catch(error => {
-      logger.error(`Failed to send level up message in channel ${levelUpChannel.id}:`, error);
+      logger.error(
+        `Failed to send level up message in channel ${levelUpChannel.id}:`,
+        error
+      );
     });
   } catch (error) {
     logger.error('Error sending level up announcement:', error);
   }
 }
+```
