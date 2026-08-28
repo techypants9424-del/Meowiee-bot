@@ -53,8 +53,8 @@ const embed = createEmbed({
     description:
         `> 🪙 **${meowCoins.toLocaleString()} MeowCoins**\n\n` +
         `> 💬 Keep chatting\n\n` +
-        `> 💼 Complete \`/work\` tasks\n\n` +
-        `> 🎁 Claim \`/daily\` rewards`,
+        `> 💼 Complete **work** tasks\n\n` +
+        `> 🎁 Claim **daily** rewards`,
 })
     .setFooter({
         text: `Requested by ${interaction.user.tag}`,
