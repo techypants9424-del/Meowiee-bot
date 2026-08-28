@@ -18,9 +18,11 @@ import {
   isValidCountingMessage,
   recordCorrectCount,
 } from '../services/countingGameService.js';
+import { getEconomyData, saveEconomyData } from '../utils/economy.js';
 
 const MESSAGE_XP_RATE_LIMIT_ATTEMPTS = 12;
 const MESSAGE_XP_RATE_LIMIT_WINDOW_MS = 10000;
+
 
 export default {
   name: Events.MessageCreate,
@@ -34,16 +36,81 @@ export default {
       if (countingProcessed) {
         return;
       }
+await handlePrefixCommand(message, client);
+await handleWorkTask(message, client);
 
-      await handlePrefixCommand(message, client);
-
-      await handleLeveling(message, client);
+await handleLeveling(message, client);
     } catch (error) {
       logger.error('Error in messageCreate event:', error);
     }
   }
 };
+async function handleWorkTask(message, client) {
+  try {
+    const guildId = message.guild.id;
+    const userId = message.author.id;
 
+    const data = await getEconomyData(client, guildId, userId);
+
+    const task = data.workTask;
+
+    // No active work task
+    if (!task) {
+      return;
+    }
+
+    // Task expired
+    if (Date.now() > task.expiresAt) {
+      delete data.workTask;
+      await saveEconomyData(client, guildId, userId, data);
+
+      await message.channel.send({
+        content: `⏰ <@${userId}> your work task expired! Run \`/work\` to get a new task.`,
+      }).catch(() => {});
+
+      return;
+    }
+
+    // Only count message tasks
+    if (task.type !== 'messages') {
+      return;
+    }
+
+    // Don't count empty messages
+    if (!message.content || !message.content.trim()) {
+      return;
+    }
+
+    // Increase progress
+    task.progress += 1;
+
+    // Task completed
+    if (task.progress >= task.required) {
+      const reward = task.reward;
+
+      data.wallet = (data.wallet || 0) + reward;
+
+      delete data.workTask;
+
+      await saveEconomyData(client, guildId, userId, data);
+
+      await message.channel.send({
+        content:
+          `🎉 **Work Complete!**\n\n` +
+          `<@${userId}> completed their work task!\n` +
+          `💰 You earned **${reward.toLocaleString()} MeowCoins**!`,
+      }).catch(() => {});
+
+      return;
+    }
+
+    // Save progress
+    await saveEconomyData(client, guildId, userId, data);
+
+  } catch (error) {
+    logger.error('Error handling work task:', error);
+  }
+}
 async function handlePrefixCommand(message, client) {
   try {
     const guildConfig = await getGuildConfig(client, message.guild.id);
@@ -241,6 +308,7 @@ async function handleLeveling(message, client) {
     if (!canProcess) {
       return;
     }
+
 
     const levelingConfig = await getLevelingConfig(client, message.guild.id);
     
