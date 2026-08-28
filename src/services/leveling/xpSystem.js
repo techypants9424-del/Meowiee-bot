@@ -109,7 +109,6 @@ async function awardRoleReward(guild, member, roleId, level) {
   }
 }
 
-```js
 async function sendLevelUpAnnouncement(guild, member, levelData, config) {
   try {
     const levelUpChannel = config.levelUpChannel
@@ -151,4 +150,4 @@ async function sendLevelUpAnnouncement(guild, member, levelData, config) {
     logger.error('Error sending level up announcement:', error);
   }
 }
-```
+
