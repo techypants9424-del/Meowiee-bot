@@ -12,8 +12,6 @@ export async function getEconomyData(client, guildId, userId) {
     if (!data) {
         data = {
             wallet: 0,
-            bank: 0,
-            bankCapacity: 1000,
             lastDaily: 0,
             lastWork: 0,
         };
@@ -21,48 +19,45 @@ export async function getEconomyData(client, guildId, userId) {
         await client.db.set(key, data);
     }
 
+    // Remove old bank data from existing users
+    if ('bank' in data) delete data.bank;
+    if ('bankCapacity' in data) delete data.bankCapacity;
+
     return data;
 }
 
 export async function saveEconomyData(client, guildId, userId, data) {
     const key = getEconomyKey(guildId, userId);
+
+    // Make sure bank data can never come back
+    delete data.bank;
+    delete data.bankCapacity;
+
     await client.db.set(key, data);
 }
 
-export async function addMoney(client, guildId, userId, amount, type = 'wallet') {
+export async function addMoney(client, guildId, userId, amount) {
     const data = await getEconomyData(client, guildId, userId);
 
-    if (type === 'bank') {
-        data.bank += amount;
-    } else {
-        data.wallet += amount;
-    }
+    data.wallet = (data.wallet || 0) + amount;
 
     await saveEconomyData(client, guildId, userId, data);
 
     return {
-        newBalance: type === 'bank' ? data.bank : data.wallet,
+        newBalance: data.wallet,
         data,
     };
 }
 
-export async function removeMoney(client, guildId, userId, amount, type = 'wallet') {
+export async function removeMoney(client, guildId, userId, amount) {
     const data = await getEconomyData(client, guildId, userId);
 
-    if (type === 'bank') {
-        data.bank = Math.max(0, data.bank - amount);
-    } else {
-        data.wallet = Math.max(0, data.wallet - amount);
-    }
+    data.wallet = Math.max(0, (data.wallet || 0) - amount);
 
     await saveEconomyData(client, guildId, userId, data);
 
     return {
-        newBalance: type === 'bank' ? data.bank : data.wallet,
+        newBalance: data.wallet,
         data,
     };
-}
-
-export function getMaxBankCapacity(data) {
-    return data.bankCapacity || 1000;
 }
