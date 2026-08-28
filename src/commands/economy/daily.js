@@ -71,7 +71,7 @@ export default {
 
         // Random reward: 100 - 500 MeowCoins
         const reward =
-            Math.floor(Math.random() * 401) + 100;
+            Math.floor(Math.random() * 90) + 10;
 
         // Add reward to wallet
         data.wallet = (data.wallet || 0) + reward;
