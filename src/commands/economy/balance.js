@@ -51,10 +51,11 @@ const meowCoins = data.wallet || 0;
 const embed = createEmbed({
     title: `🐱 ${targetUser.username}'s MeowCoins`,
     description:
-        `> 🪙 **${meowCoins.toLocaleString()} MeowCoins**\n\n` +
-        `> 💬 Keep chatting\n\n` +
-        `> 💼 Complete **work** tasks\n\n` +
-        `> 🎁 Claim **daily** rewards`,
+        `🪙 **${meowCoins.toLocaleString()} MeowCoins**\n\n` +
+        `💬 Keep chatting\n` +
+        `💼 Complete **work** tasks\n` +
+        `🎁 Claim **daily** rewards`,
+    color: 'green',
 })
     .setFooter({
         text: `Requested by ${interaction.user.tag}`,
