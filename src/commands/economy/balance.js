@@ -1,13 +1,13 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { createEmbed } from '../../utils/embeds.js';
-import { getEconomyData, getMaxBankCapacity } from '../../utils/economy.js';
+import { getEconomyData } from '../../utils/economy.js';
 import { withErrorHandling, createError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
 export default {
     data: new SlashCommandBuilder()
         .setName('balance')
-        .setDescription("Check your or someone else's balance")
+        .setDescription("Check your or someone else's MeowCoins")
         .addUserOption(option =>
             option
                 .setName('user')
@@ -15,7 +15,7 @@ export default {
                 .setRequired(false)
         ),
 
-    async execute(interaction, config, client) {
+    execute: withErrorHandling(async (interaction, config, client) => {
         const deferred = await InteractionHelper.safeDefer(interaction);
         if (!deferred) return;
 
@@ -30,7 +30,6 @@ export default {
             );
         }
 
-        // IMPORTANT: this makes the economy server-specific
         const guildId = interaction.guildId;
 
         const data = await getEconomyData(
@@ -40,27 +39,20 @@ export default {
         );
 
         const wallet = data.wallet || 0;
-        const bank = data.bank || 0;
-        const maxBank = getMaxBankCapacity(data);
 
         const embed = createEmbed({
-            title: `💰 ${targetUser.username}'s Balance`,
-            description: `Here is the current balance for ${targetUser.username}.`,
+            title: `🐱 ${targetUser.username}'s MeowCoins`,
+            description: `Here is the current MeowCoins balance for ${targetUser.username}.`,
         })
             .addFields(
                 {
-                    name: '💵 Cash',
-                    value: `$${wallet.toLocaleString()}`,
-                    inline: true,
-                },
-                {
-                    name: '🏦 Bank',
-                    value: `$${bank.toLocaleString()} / $${maxBank.toLocaleString()}`,
+                    name: '🐾 MeowCoins',
+                    value: `**${wallet.toLocaleString()}**`,
                     inline: true,
                 },
                 {
                     name: '💰 Total',
-                    value: `$${(wallet + bank).toLocaleString()}`,
+                    value: `**${wallet.toLocaleString()} MeowCoins**`,
                     inline: true,
                 }
             )
@@ -72,5 +64,5 @@ export default {
         await InteractionHelper.safeEditReply(interaction, {
             embeds: [embed],
         });
-    },
+    }, { command: 'balance' }),
 };
