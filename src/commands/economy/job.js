@@ -3,7 +3,9 @@ export default {
         .setName('job')
         .setDescription('Browse available MeowCoins jobs'),
 
-    execute: ...
+    execute: withErrorHandling(async (interaction, config, client) => {
+        // your existing code here
+    }, { command: 'job' }),
 };
 import {
     SlashCommandBuilder,
