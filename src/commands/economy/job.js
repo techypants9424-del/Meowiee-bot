@@ -6,22 +6,13 @@ import {
 } from 'discord.js';
 
 import { createEmbed } from '../../utils/embeds.js';
-import {
-    getOpenJobs,
-} from '../../utils/databaseJob.js';
-
-import {
-    withErrorHandling,
-    createError,
-    ErrorTypes
-} from '../../utils/errorHandler.js';
-
+import { withErrorHandling } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
 export default {
     data: new SlashCommandBuilder()
         .setName('job')
-        .setDescription('View available MeowCoin jobs'),
+        .setDescription('Browse available MeowCoins jobs'),
 
     execute: withErrorHandling(async (interaction, config, client) => {
         const deferred = await InteractionHelper.safeDefer(interaction);
@@ -30,23 +21,37 @@ export default {
         const guildId = interaction.guildId;
 
         if (!guildId) {
-            throw createError(
-                'Job used outside a server',
-                ErrorTypes.VALIDATION,
-                'This command can only be used inside a server.'
-            );
+            await InteractionHelper.safeEditReply(interaction, {
+                content: '❌ This command can only be used inside a server.',
+            });
+            return;
         }
 
-        // Get open jobs
-        const jobs = await getOpenJobs(client, guildId);
+        // Get all open hires
+        const keys = await client.db.list('hire:');
 
-        // No jobs available
-        if (!jobs.length) {
+        let hires = [];
+
+        if (Array.isArray(keys)) {
+            for (const key of keys) {
+                const hire = await client.db.get(key, null);
+
+                if (
+                    hire &&
+                    hire.status === 'open' &&
+                    hire.guildId === guildId
+                ) {
+                    hires.push(hire);
+                }
+            }
+        }
+
+        if (hires.length === 0) {
             const embed = createEmbed({
-                title: '💼 MeowJobs',
+                title: '📋 Available Jobs',
                 description:
                     'There are currently **no open jobs**.\n\n' +
-                    'Use `/hire` to create a job and offer MeowCoins for help!',
+                    'Check back later for new MeowCoin jobs!',
             });
 
             await InteractionHelper.safeEditReply(interaction, {
@@ -56,38 +61,38 @@ export default {
             return;
         }
 
-        // Discord select menus can have a maximum of 25 options
-        const visibleJobs = jobs.slice(0, 25);
+        // Newest jobs first
+        hires.sort((a, b) => b.createdAt - a.createdAt);
 
-        const options = visibleJobs.map(job => {
-            const reward = Number(job.reward || 0);
+        // Discord select menus can only have 25 options
+        hires = hires.slice(0, 25);
+
+        const options = hires.map((hire) => {
+            const reason =
+                hire.reason.length > 90
+                    ? `${hire.reason.substring(0, 87)}...`
+                    : hire.reason;
 
             return new StringSelectMenuOptionBuilder()
-                .setLabel(
-                    job.description.length > 100
-                        ? `${job.description.substring(0, 97)}...`
-                        : job.description
-                )
+                .setLabel(reason)
                 .setDescription(
-                    `${reward.toLocaleString()} MeowCoins • Job #${job.id.slice(-6)}`
+                    `${hire.coins.toLocaleString()} MeowCoins • Job #${hire.id.slice(-6)}`
                 )
-                .setValue(job.id);
+                .setValue(hire.id);
         });
 
-        const selectMenu = new StringSelectMenuBuilder()
+        const menu = new StringSelectMenuBuilder()
             .setCustomId('job_select')
-            .setPlaceholder('🐱 Select a job')
+            .setPlaceholder('Select a job to view it')
             .addOptions(options);
 
-        const row = new ActionRowBuilder()
-            .addComponents(selectMenu);
+        const row = new ActionRowBuilder().addComponents(menu);
 
         const embed = createEmbed({
-            title: '💼 MeowJobs',
+            title: '💼 MeowCoins Job Board',
             description:
-                'Here are the available jobs!\n\n' +
-                'Select a job below to view its details and accept it.\n\n' +
-                `📋 **${visibleJobs.length}** job${visibleJobs.length === 1 ? '' : 's'} available`,
+                'Browse the available jobs below and select one to view the details.\n\n' +
+                '🪙 Rewards are paid in **MeowCoins** after the job is completed and approved by a moderator.',
         });
 
         await InteractionHelper.safeEditReply(interaction, {
