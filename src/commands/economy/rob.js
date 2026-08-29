@@ -101,6 +101,20 @@ export default {
 
         const targetCoins = targetData.wallet || 0;
         const robberCoins = robberData.wallet || 0;
+        if (robberCoins <= 0) {
+    const embed = createEmbed({
+        title: '🪙 No MeowCoins!',
+        description:
+            `You can't rob anyone yet!\n\n` +
+            `You need some MeowCoins first. Try \`daily\` or \`work\` to earn some.`,
+    });
+
+    await InteractionHelper.safeEditReply(interaction, {
+        embeds: [embed],
+    });
+
+    return;
+}
 
         // Target has nothing
         if (targetCoins <= 0) {
