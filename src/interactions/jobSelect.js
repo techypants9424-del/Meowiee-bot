@@ -9,7 +9,7 @@ import { InteractionHelper } from '../utils/interactionHelper.js';
 import { getJob } from '../utils/databaseJob.js';
 
 export default {
-    customId: 'job_select',
+    name: 'job_select',
 
     async execute(interaction, client) {
         const hireId = interaction.values?.[0];
@@ -36,13 +36,12 @@ export default {
             await InteractionHelper.safeReply(interaction, {
                 content:
                     '❌ This job is no longer available.\n\n' +
-                    `Status: **${job.status}**`,
+                    `📌 Status: **${job.status}**`,
                 ephemeral: true,
             });
             return;
         }
 
-        // Employer cannot accept their own job
         if (job.employerId === interaction.user.id) {
             await InteractionHelper.safeReply(interaction, {
                 content: '❌ You cannot accept your own job.',
@@ -51,14 +50,18 @@ export default {
             return;
         }
 
+        const reward = Number(job.coins) || 0;
+
         const embed = createEmbed({
             title: '💼 Job Details',
             description:
                 `📝 **Job:**\n${job.reason}\n\n` +
-                `🪙 **Reward:** **${Number(job.coins).toLocaleString()} MeowCoins**\n` +
-                `📌 **Status:** Open\n\n` +
+                `🪙 **Reward:** **${reward.toLocaleString()} MeowCoins**\n` +
+                `📌 **Status:** **Open**\n\n` +
                 `👤 **Posted by:** <@${job.employerId}>\n\n` +
-                `Click **Accept Job** if you want to complete this job.`,
+                `━━━━━━━━━━━━━━━━━━\n\n` +
+                `Want to complete this job?\n` +
+                `Click **Accept Job** below to start.`,
         });
 
         const row = new ActionRowBuilder().addComponents(
