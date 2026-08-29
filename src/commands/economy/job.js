@@ -1,3 +1,10 @@
+export default {
+    data: new SlashCommandBuilder()
+        .setName('job')
+        .setDescription('Browse available MeowCoins jobs'),
+
+    execute: ...
+};
 import {
     SlashCommandBuilder,
     ActionRowBuilder,
