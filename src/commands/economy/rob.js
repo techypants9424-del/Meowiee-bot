@@ -9,7 +9,7 @@ import {
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
 const COOLDOWN = 30 * 60 * 1000; // 30 minutes
-const SUCCESS_CHANCE = 0.60; // 60%
+const SUCCESS_CHANCE = 0.20; // 20% success, 80% fail
 const FAILED_COST = 25;
 
 export default {
