@@ -1,4 +1,4 @@
-const JOB_PREFIX = 'job:';
+const JOB_PREFIX = 'hire:';
 
 /**
  * Generate a unique Job ID
@@ -24,29 +24,24 @@ export async function createJob(client, jobData) {
         id: jobId,
 
         guildId: jobData.guildId,
-        hirerId: jobData.hirerId,
+        employerId: jobData.employerId,
 
-        description: jobData.description,
-        reward: Number(jobData.reward),
+        reason: jobData.reason,
+        coins: Number(jobData.coins),
 
         status: 'open',
 
         workerId: null,
         channelId: null,
 
-        proofUrl: null,
-
         createdAt: Date.now(),
         acceptedAt: null,
-        proofSubmittedAt: null,
         completedAt: null,
+        approvedAt: null,
         updatedAt: Date.now(),
     };
 
-    await client.db.set(
-        getJobKey(jobId),
-        job
-    );
+    await client.db.set(getJobKey(jobId), job);
 
     return job;
 }
@@ -147,8 +142,7 @@ export async function getJobs(client, filters = {}) {
 
     jobs.sort(
         (a, b) =>
-            (b.createdAt || 0) -
-            (a.createdAt || 0)
+            (b.createdAt || 0) - (a.createdAt || 0)
     );
 
     return jobs.slice(0, limit);
@@ -175,13 +169,14 @@ export async function getUserActiveJobs(client, userId) {
 
     return jobs.filter(job =>
         (
-            job.hirerId === userId ||
+            job.employerId === userId ||
             job.workerId === userId
         ) &&
         [
             'open',
-            'active',
-            'proof_submitted'
+            'in_progress',
+            'completed',
+            'approved'
         ].includes(job.status)
     );
 }
