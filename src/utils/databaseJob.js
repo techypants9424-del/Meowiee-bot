@@ -111,8 +111,9 @@ export async function getJobs(client, filters = {}) {
 
     if (!Array.isArray(keys)) {
         if (typeof keys === 'object' && keys !== null) {
-            keys = Object.keys(keys)
-                .filter(key => key.startsWith(JOB_PREFIX));
+            keys = Object.keys(keys).filter(
+                key => key.startsWith(JOB_PREFIX)
+            );
         } else {
             return [];
         }
