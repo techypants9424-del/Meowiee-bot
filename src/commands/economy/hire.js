@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { createEmbed } from '../../utils/embeds.js';
-import { getEconomyData } from '../../utils/economy.js';
+import { getEconomyData, removeMoney } from '../../utils/economy.js';
 import {
     withErrorHandling,
     createError,
@@ -54,14 +54,14 @@ export default {
 
         const balance = economy.wallet || 0;
 
-        // Not enough coins
+        // Check balance
         if (balance < coins) {
             const embed = createEmbed({
                 title: '🪙 Not Enough MeowCoins',
                 description:
                     `You don't have enough MeowCoins to create this hire.\n\n` +
-                    `🪙 Your balance: **${balance.toLocaleString()} MeowCoins**\n` +
-                    `💰 Required: **${coins.toLocaleString()} MeowCoins**`,
+                    `🪙 **Your balance:** ${balance.toLocaleString()} MeowCoins\n` +
+                    `💰 **Required:** ${coins.toLocaleString()} MeowCoins`,
                 color: 'error',
             });
 
@@ -72,35 +72,98 @@ export default {
             return;
         }
 
-        // For now we only create the application.
-        // Coins are NOT removed yet.
-        //
-        // Later:
-        // 1. Reserve the coins
-        // 2. Create the job
-        // 3. Worker completes it
-        // 4. Worker submits proof
-        // 5. Moderator approves
-        // 6. Coins go to worker
-
+        /*
+         * CREATE UNIQUE HIRE ID
+         */
         const hireId = `${Date.now()}-${userId}`;
+
+        /*
+         * ESCROW THE MONEY
+         *
+         * The employer's coins are removed immediately.
+         * They will stay locked inside the hire until:
+         *
+         * APPROVED  -> worker receives coins
+         * CANCELLED -> employer gets coins back
+         */
+        await removeMoney(
+            client,
+            guildId,
+            userId,
+            coins
+        );
 
         const hireData = {
             id: hireId,
+
+            // Person who created the job
             employerId: userId,
+
+            // Server where the job was created
             guildId,
+
+            // Job description
             reason,
+
+            // Locked reward
             coins,
+
+            // Job state
             status: 'open',
-            createdAt: Date.now(),
+
+            // Worker who accepts it
             workerId: null,
+
+            // Proof / completion information
             proof: null,
+
+            // Channel created after accepting
+            channelId: null,
+
+            createdAt: Date.now(),
+            acceptedAt: null,
+            completedAt: null,
+
+            // Moderator who approved it
+            approvedBy: null,
         };
 
-        // Save hire globally so the job system can access it later
+        /*
+         * Save hire globally.
+         */
         const hireKey = `hire:${hireId}`;
 
-        await client.db.set(hireKey, hireData);
+        try {
+            await client.db.set(hireKey, hireData);
+        } catch (error) {
+            /*
+             * VERY IMPORTANT:
+             *
+             * If saving the hire fails after removing the coins,
+             * refund the employer so their coins aren't lost.
+             */
+            await import('../../utils/economy.js')
+                .then(({ addMoney }) =>
+                    addMoney(
+                        client,
+                        guildId,
+                        userId,
+                        coins
+                    )
+                )
+                .catch(() => {});
+
+            throw error;
+        }
+
+        // Get new balance
+        const updatedEconomy = await getEconomyData(
+            client,
+            guildId,
+            userId
+        );
+
+        const newBalance = updatedEconomy.wallet || 0;
 
         const embed = createEmbed({
             title: '📋 Hire Created!',
@@ -108,7 +171,10 @@ export default {
                 `Your hire request has been created successfully!\n\n` +
                 `📝 **Job:** ${reason}\n` +
                 `🪙 **Reward:** ${coins.toLocaleString()} MeowCoins\n` +
+                `🔒 **Coins:** Locked in escrow\n` +
                 `📌 **Status:** Open\n\n` +
+                `Your reward will be given to the person who completes the job and gets it approved by a moderator.\n\n` +
+                `💰 **Remaining balance:** ${newBalance.toLocaleString()} MeowCoins\n\n` +
                 `Use **job** to browse available jobs.`,
             color: 'success',
         });
