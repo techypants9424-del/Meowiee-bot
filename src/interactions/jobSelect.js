@@ -12,14 +12,14 @@ export default {
     name: 'job_select',
 
     async execute(interaction, client) {
-        try {
-            // Acknowledge the select menu immediately.
-            // This prevents "Meowiee didn't respond" while
-            // the database request is running.
-            if (!interaction.replied && !interaction.deferred) {
-                await interaction.deferUpdate();
-            }
+        // ACKNOWLEDGE THE SELECT MENU IMMEDIATELY
+        const ready = await InteractionHelper.safeDefer(interaction);
 
+        if (!ready) {
+            return;
+        }
+
+        try {
             const hireId = interaction.values?.[0];
 
             if (!hireId) {
@@ -31,7 +31,14 @@ export default {
                 return;
             }
 
+            console.log(`[JOB_SELECT] Selected job: ${hireId}`);
+
             const job = await getJob(client, hireId);
+
+            console.log(
+                `[JOB_SELECT] Job lookup result:`,
+                job ? `FOUND (${job.status})` : 'NOT FOUND'
+            );
 
             if (!job) {
                 await InteractionHelper.safeEditReply(interaction, {
@@ -89,14 +96,17 @@ export default {
                 embeds: [embed],
                 components: [row],
             });
+
+            console.log(`[JOB_SELECT] Successfully displayed job ${job.id}`);
+
         } catch (error) {
-            console.error('Error in job_select:', error);
+            console.error('[JOB_SELECT] ERROR:', error);
 
             await InteractionHelper.safeEditReply(interaction, {
                 content: '❌ Something went wrong while loading this job.',
                 embeds: [],
                 components: [],
-            }).catch(() => {});
+            });
         }
     },
 };
