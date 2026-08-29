@@ -10,7 +10,7 @@ import { createEmbed } from '../utils/embeds.js';
 import { InteractionHelper } from '../utils/interactionHelper.js';
 
 export default {
-    customId: 'job_accept',
+    name: 'job_accept',
 
     async execute(interaction, client, args) {
         const hireId = args?.[0];
