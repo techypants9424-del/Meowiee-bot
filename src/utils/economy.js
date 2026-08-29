@@ -1,7 +1,8 @@
 const ECONOMY_PREFIX = 'economy:';
 
 export function getEconomyKey(guildId, userId) {
-    return `${ECONOMY_PREFIX}${guildId}:${userId}`;
+    // Global economy — guildId is intentionally NOT used
+    return `${ECONOMY_PREFIX}${userId}`;
 }
 
 export async function getEconomyData(client, guildId, userId) {
@@ -19,7 +20,7 @@ export async function getEconomyData(client, guildId, userId) {
         await client.db.set(key, data);
     }
 
-    // Remove old bank data from existing users
+    // Remove old bank data
     if ('bank' in data) delete data.bank;
     if ('bankCapacity' in data) delete data.bankCapacity;
 
