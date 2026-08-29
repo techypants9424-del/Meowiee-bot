@@ -581,58 +581,72 @@ export default {
          * =========================
          */
         if (interaction.isButton()) {
-          if (
-            interaction.customId.startsWith(
-              'shared_todo_'
-            )
-          ) {
-            const parts =
-              interaction.customId.split('_');
+          // =========================
+// TICKET CREATE BUTTON
+// =========================
+if (interaction.customId === 'create_ticket') {
+  try {
+    const deferred = await InteractionHelper.safeDefer(interaction, {
+      flags: MessageFlags.Ephemeral,
+    });
 
-            const buttonType = parts
-              .slice(0, 3)
-              .join('_');
+    if (!deferred) {
+      return;
+    }
 
-            const listId = parts[3];
+    const guildConfig = await getGuildConfig(
+      client,
+      interaction.guildId,
+      interactionTraceContext
+    );
 
-            const button =
-              client.buttons.get(buttonType);
+    const categoryId = guildConfig?.ticketCategoryId || null;
 
-            if (button) {
-              try {
-                await button.execute(
-                  interaction,
-                  client,
-                  [listId]
-                );
-              } catch (error) {
-                await handleInteractionError(
-                  interaction,
-                  error,
-                  withTraceContext(
-                    {
-                      type: 'button',
-                      customId: interaction.customId,
-                      handler: 'todo',
-                    },
-                    interactionTraceContext
-                  )
-                );
-              }
-            } else {
-              throw createError(
-                `No button handler found for ${buttonType}`,
-                ErrorTypes.CONFIGURATION,
-                'This button is not available.',
-                withTraceContext(
-                  { buttonType },
-                  interactionTraceContext
-                )
-              );
-            }
+    const result = await createTicket(
+      interaction.guild,
+      interaction.member,
+      categoryId,
+      'Support ticket',
+      'none'
+    );
 
-            return;
-          }
+    await InteractionHelper.safeEditReply(interaction, {
+      content: `✅ Your ticket has been created: ${result.channel}`,
+    });
+
+    logger.info('Ticket created from panel button', {
+      guildId: interaction.guildId,
+      userId: interaction.user.id,
+      channelId: result.channel.id,
+      channelName: result.channel.name,
+      commandName: 'create_ticket',
+    });
+
+  } catch (error) {
+    logger.error('Create ticket button failed', {
+      error: error?.message,
+      stack: error?.stack,
+      guildId: interaction.guildId,
+      userId: interaction.user?.id,
+      customId: interaction.customId,
+    });
+
+    await handleInteractionError(
+      interaction,
+      error,
+      withTraceContext(
+        {
+          type: 'button',
+          customId: interaction.customId,
+          handler: 'create_ticket',
+        },
+        interactionTraceContext
+      )
+    );
+  }
+
+  return;
+}
 
           const [customId, ...args] =
             interaction.customId.split(':');
