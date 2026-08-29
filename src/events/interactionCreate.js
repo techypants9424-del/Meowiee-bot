@@ -9,11 +9,22 @@ import {
 } from '../config/bot.js';
 import botConfig from '../config/bot.js';
 import { handleApplicationModal } from '../commands/Community/apply.js';
-import { handleInteractionError, createError, ErrorTypes, ErrorCodes } from '../utils/errorHandler.js';
+import {
+  handleInteractionError,
+  createError,
+  ErrorTypes,
+  ErrorCodes,
+} from '../utils/errorHandler.js';
 import { InteractionHelper } from '../utils/interactionHelper.js';
-import { createInteractionTraceContext, runWithTraceContext } from '../utils/logger.js';
+import {
+  createInteractionTraceContext,
+  runWithTraceContext,
+} from '../utils/logger.js';
 import { validateChatInputPayloadOrThrow } from '../utils/commandInputValidation.js';
-import { enforceAbuseProtection, formatCooldownDuration } from '../utils/abuseProtection.js';
+import {
+  enforceAbuseProtection,
+  formatCooldownDuration,
+} from '../utils/abuseProtection.js';
 import { isCommandEnabled } from '../services/commandAccessService.js';
 import { resolveSlashAccessKey } from '../utils/messageAdapter.js';
 import { isCollectorManagedComponent } from '../utils/collectorComponents.js';
@@ -42,14 +53,16 @@ function withTraceContext(context = {}, traceContext = {}) {
     guildId: context.guildId || traceContext.guildId,
     userId: context.userId || traceContext.userId,
     command: context.commandName || traceContext.command,
-    ...context
+    ...context,
   };
 }
 
 export default {
   name: Events.InteractionCreate,
+
   async execute(interaction, client) {
     const interactionTraceContext = createInteractionTraceContext(interaction);
+
     interaction.traceContext = interactionTraceContext;
     interaction.traceId = interactionTraceContext.traceId;
 
@@ -58,20 +71,34 @@ export default {
         InteractionHelper.patchInteractionResponses(interaction);
         ResponseCoordinator.attach(interaction);
 
+        /*
+         * =========================
+         * CHAT INPUT COMMANDS
+         * =========================
+         */
         if (interaction.isChatInputCommand()) {
           try {
-            logger.info(`Command executed: /${interaction.commandName} by ${interaction.user.tag}`, {
-              event: 'interaction.command.received',
-              traceId: interactionTraceContext.traceId,
-              guildId: interaction.guildId,
-              userId: interaction.user?.id,
-              command: interaction.commandName
-            });
+            logger.info(
+              `Command executed: /${interaction.commandName} by ${interaction.user.tag}`,
+              {
+                event: 'interaction.command.received',
+                traceId: interactionTraceContext.traceId,
+                guildId: interaction.guildId,
+                userId: interaction.user?.id,
+                command: interaction.commandName,
+              }
+            );
 
-            validateChatInputPayloadOrThrow(interaction, withTraceContext({
-              type: 'command_input_validation',
-              commandName: interaction.commandName
-            }, interactionTraceContext));
+            validateChatInputPayloadOrThrow(
+              interaction,
+              withTraceContext(
+                {
+                  type: 'command_input_validation',
+                  commandName: interaction.commandName,
+                },
+                interactionTraceContext
+              )
+            );
 
             const command = client.commands.get(interaction.commandName);
 
@@ -80,16 +107,25 @@ export default {
                 `No command matching ${interaction.commandName} was found.`,
                 ErrorTypes.CONFIGURATION,
                 'Sorry, that command does not exist.',
-                withTraceContext({ commandName: interaction.commandName }, interactionTraceContext)
+                withTraceContext(
+                  { commandName: interaction.commandName },
+                  interactionTraceContext
+                )
               );
             }
 
-            if (isMaintenanceMode() && !isBotOwner(interaction.user.id)) {
+            if (
+              isMaintenanceMode() &&
+              !isBotOwner(interaction.user.id)
+            ) {
               throw createError(
                 'Bot is in maintenance mode',
                 ErrorTypes.CONFIGURATION,
                 getBotMessage('maintenanceMode'),
-                withTraceContext({ commandName: interaction.commandName }, interactionTraceContext)
+                withTraceContext(
+                  { commandName: interaction.commandName },
+                  interactionTraceContext
+                )
               );
             }
 
@@ -98,247 +134,516 @@ export default {
                 `Feature disabled for category ${command.category}`,
                 ErrorTypes.CONFIGURATION,
                 getBotMessage('commandDisabled'),
-                withTraceContext({ commandName: interaction.commandName, category: command.category }, interactionTraceContext)
+                withTraceContext(
+                  {
+                    commandName: interaction.commandName,
+                    category: command.category,
+                  },
+                  interactionTraceContext
+                )
               );
             }
 
-            const defaultCooldownSec = Number(botConfig.commands?.defaultCooldown) || 0;
-            if (defaultCooldownSec > 0 && !isBotOwner(interaction.user.id)) {
-              const cooldownKey = `${interaction.user.id}:${interaction.commandName}`;
+            const defaultCooldownSec =
+              Number(botConfig.commands?.defaultCooldown) || 0;
+
+            if (
+              defaultCooldownSec > 0 &&
+              !isBotOwner(interaction.user.id)
+            ) {
+              const cooldownKey =
+                `${interaction.user.id}:${interaction.commandName}`;
+
               const expiresAt = client.cooldowns.get(cooldownKey);
 
               if (expiresAt && Date.now() < expiresAt) {
-                const remainingSec = Math.ceil((expiresAt - Date.now()) / 1000);
+                const remainingSec = Math.ceil(
+                  (expiresAt - Date.now()) / 1000
+                );
+
                 throw createError(
                   `Default command cooldown active for ${interaction.commandName}`,
                   ErrorTypes.RATE_LIMIT,
-                  getBotMessage('cooldownActive', { time: `${remainingSec}s` }),
-                  withTraceContext({ commandName: interaction.commandName, remainingSec }, interactionTraceContext)
+                  getBotMessage('cooldownActive', {
+                    time: `${remainingSec}s`,
+                  }),
+                  withTraceContext(
+                    {
+                      commandName: interaction.commandName,
+                      remainingSec,
+                    },
+                    interactionTraceContext
+                  )
                 );
               }
 
-              client.cooldowns.set(cooldownKey, Date.now() + defaultCooldownSec * 1000);
+              client.cooldowns.set(
+                cooldownKey,
+                Date.now() + defaultCooldownSec * 1000
+              );
             }
 
-            const abuseProtection = await enforceAbuseProtection(interaction, command, interaction.commandName);
+            const abuseProtection = await enforceAbuseProtection(
+              interaction,
+              command,
+              interaction.commandName
+            );
+
             if (!abuseProtection.allowed) {
-              const formattedCooldown = formatCooldownDuration(abuseProtection.remainingMs);
+              const formattedCooldown = formatCooldownDuration(
+                abuseProtection.remainingMs
+              );
+
               throw createError(
                 `Risky command cooldown active for ${interaction.commandName}`,
                 ErrorTypes.RATE_LIMIT,
                 `This command is on cooldown. Please wait ${formattedCooldown} before trying again.`,
-                withTraceContext({
-                  commandName: interaction.commandName,
-                  subtype: 'command_cooldown',
-                  expected: true,
-                  cooldownMs: abuseProtection.remainingMs,
-                  cooldownWindowMs: abuseProtection.policy?.windowMs,
-                  cooldownMaxAttempts: abuseProtection.policy?.maxAttempts
-                }, interactionTraceContext)
+                withTraceContext(
+                  {
+                    commandName: interaction.commandName,
+                    subtype: 'command_cooldown',
+                    expected: true,
+                    cooldownMs: abuseProtection.remainingMs,
+                    cooldownWindowMs:
+                      abuseProtection.policy?.windowMs,
+                    cooldownMaxAttempts:
+                      abuseProtection.policy?.maxAttempts,
+                  },
+                  interactionTraceContext
+                )
               );
             }
 
             let guildConfig = null;
+
             if (interaction.guild) {
-              guildConfig = await getGuildConfig(client, interaction.guild.id, interactionTraceContext);
+              guildConfig = await getGuildConfig(
+                client,
+                interaction.guild.id,
+                interactionTraceContext
+              );
+
               const accessKey = resolveSlashAccessKey(interaction);
-              if (!(await isCommandEnabled(client, interaction.guild.id, accessKey, command.category))) {
+
+              if (
+                !(await isCommandEnabled(
+                  client,
+                  interaction.guild.id,
+                  accessKey,
+                  command.category
+                ))
+              ) {
                 throw createError(
                   `Command ${accessKey} is disabled in this guild`,
                   ErrorTypes.CONFIGURATION,
                   'This command has been disabled for this server.',
-                  withTraceContext({ commandName: accessKey, guildId: interaction.guild.id }, interactionTraceContext)
+                  withTraceContext(
+                    {
+                      commandName: accessKey,
+                      guildId: interaction.guild.id,
+                    },
+                    interactionTraceContext
+                  )
                 );
               }
             }
 
-            const permissionAllowed = await enforceDefaultCommandPermissions(interaction, command, {
-              source: 'interactionCreate',
-              guildConfig,
-            });
+            const permissionAllowed =
+              await enforceDefaultCommandPermissions(
+                interaction,
+                command,
+                {
+                  source: 'interactionCreate',
+                  guildConfig,
+                }
+              );
+
             if (!permissionAllowed) {
               return;
             }
 
-            await command.execute(interaction, guildConfig, client);
+            await command.execute(
+              interaction,
+              guildConfig,
+              client
+            );
           } catch (error) {
-            await handleInteractionError(interaction, error, withTraceContext({
-              type: 'command',
-              commandName: interaction.commandName,
-              subtype: COMMAND_ERROR_SUBTYPES[interaction.commandName] || error?.context?.subtype,
-            }, interactionTraceContext));
+            await handleInteractionError(
+              interaction,
+              error,
+              withTraceContext(
+                {
+                  type: 'command',
+                  commandName: interaction.commandName,
+                  subtype:
+                    COMMAND_ERROR_SUBTYPES[
+                      interaction.commandName
+                    ] || error?.context?.subtype,
+                },
+                interactionTraceContext
+              )
+            );
           }
-        } else if (interaction.isAutocomplete()) {
-          const autocompleteCommand = client.commands.get(interaction.commandName);
+
+          return;
+        }
+
+        /*
+         * =========================
+         * AUTOCOMPLETE
+         * =========================
+         */
+        if (interaction.isAutocomplete()) {
+          const autocompleteCommand = client.commands.get(
+            interaction.commandName
+          );
+
           if (autocompleteCommand?.autocomplete) {
             try {
-              await autocompleteCommand.autocomplete(interaction, client);
+              await autocompleteCommand.autocomplete(
+                interaction,
+                client
+              );
             } catch (error) {
-              logger.error('Error handling command autocomplete:', {
-                error: error.message,
-                guildId: interaction.guildId,
-                commandName: interaction.commandName,
-              });
+              logger.error(
+                'Error handling command autocomplete:',
+                {
+                  error: error.message,
+                  guildId: interaction.guildId,
+                  commandName: interaction.commandName,
+                }
+              );
+
               await interaction.respond([]).catch(() => {});
             }
+
             return;
           }
 
-          const focusedOption = interaction.options.getFocused(true);
-          
-          if (interaction.commandName === 'apply' && focusedOption.name === 'application') {
-            try {
-              const { getApplicationRoles } = await import('../utils/database.js');
-              const roles = await getApplicationRoles(client, interaction.guildId);
-              const roleName = interaction.options.getString('application', false);
+          const focusedOption =
+            interaction.options.getFocused(true);
 
-              const filtered = roles.filter(role =>
-                role.enabled !== false && 
-                role.name.toLowerCase().startsWith(roleName?.toLowerCase() || '')
+          if (
+            interaction.commandName === 'apply' &&
+            focusedOption.name === 'application'
+          ) {
+            try {
+              const {
+                getApplicationRoles,
+              } = await import('../utils/database.js');
+
+              const roles = await getApplicationRoles(
+                client,
+                interaction.guildId
               );
-              
+
+              const roleName =
+                interaction.options.getString(
+                  'application',
+                  false
+                );
+
+              const filtered = roles.filter((role) =>
+                role.enabled !== false &&
+                role.name
+                  .toLowerCase()
+                  .startsWith(
+                    roleName?.toLowerCase() || ''
+                  )
+              );
+
               await interaction.respond(
-                filtered.slice(0, 25).map(role => ({
-                  name: `${role.name}${role.enabled === false ? ' (disabled)' : ''}`,
-                  value: role.name
+                filtered.slice(0, 25).map((role) => ({
+                  name: `${role.name}${
+                    role.enabled === false
+                      ? ' (disabled)'
+                      : ''
+                  }`,
+                  value: role.name,
                 }))
               );
             } catch (error) {
-              logger.error('Error handling autocomplete:', {
-                error: error.message,
-                guildId: interaction.guildId,
-                commandName: interaction.commandName
-              });
+              logger.error(
+                'Error handling autocomplete:',
+                {
+                  error: error.message,
+                  guildId: interaction.guildId,
+                  commandName: interaction.commandName,
+                }
+              );
+
               await interaction.respond([]);
             }
-          } else if (interaction.commandName === 'app-admin' && focusedOption.name === 'application') {
-            try {
-              const { getApplicationRoles } = await import('../utils/database.js');
-              const roles = await getApplicationRoles(client, interaction.guildId);
-              const appName = interaction.options.getString('application', false);
 
-              const filtered = roles.filter(role =>
-                role.name.toLowerCase().startsWith(appName?.toLowerCase() || '')
+            return;
+          }
+
+          if (
+            interaction.commandName === 'app-admin' &&
+            focusedOption.name === 'application'
+          ) {
+            try {
+              const {
+                getApplicationRoles,
+              } = await import('../utils/database.js');
+
+              const roles = await getApplicationRoles(
+                client,
+                interaction.guildId
               );
-              
+
+              const appName =
+                interaction.options.getString(
+                  'application',
+                  false
+                );
+
+              const filtered = roles.filter((role) =>
+                role.name
+                  .toLowerCase()
+                  .startsWith(
+                    appName?.toLowerCase() || ''
+                  )
+              );
+
               await interaction.respond(
-                filtered.slice(0, 25).map(role => ({
-                  name: `${role.name}${role.enabled === false ? ' (disabled)' : ''}`,
-                  value: role.name
+                filtered.slice(0, 25).map((role) => ({
+                  name: `${role.name}${
+                    role.enabled === false
+                      ? ' (disabled)'
+                      : ''
+                  }`,
+                  value: role.name,
                 }))
               );
             } catch (error) {
-              logger.error('Error handling app-admin autocomplete:', {
-                error: error.message,
-                guildId: interaction.guildId,
-                commandName: interaction.commandName
-              });
+              logger.error(
+                'Error handling app-admin autocomplete:',
+                {
+                  error: error.message,
+                  guildId: interaction.guildId,
+                  commandName: interaction.commandName,
+                }
+              );
+
               await interaction.respond([]);
             }
-          } else if (interaction.commandName === 'reactroles' && focusedOption.name === 'panel') {
+
+            return;
+          }
+
+          if (
+            interaction.commandName === 'reactroles' &&
+            focusedOption.name === 'panel'
+          ) {
             try {
-              const { getAllReactionRoleMessages, deleteReactionRoleMessage } = await import('../services/reactionRoleService.js');
+              const {
+                getAllReactionRoleMessages,
+                deleteReactionRoleMessage,
+              } = await import(
+                '../services/reactionRoleService.js'
+              );
+
               const guildId = interaction.guildId;
               const guild = interaction.guild;
-              
-              let panels = await getAllReactionRoleMessages(client, guildId);
-              
+
+              const panels =
+                await getAllReactionRoleMessages(
+                  client,
+                  guildId
+                );
+
               if (!panels || panels.length === 0) {
                 await interaction.respond([]);
                 return;
               }
 
               const validPanels = [];
+
               for (const panel of panels) {
-                if (!panel.messageId || !panel.channelId) {
+                if (
+                  !panel.messageId ||
+                  !panel.channelId
+                ) {
                   continue;
                 }
-                
-                const channel = guild.channels.cache.get(panel.channelId);
+
+                const channel =
+                  guild.channels.cache.get(
+                    panel.channelId
+                  );
+
                 if (!channel) {
-                  await deleteReactionRoleMessage(client, guildId, panel.messageId).catch(() => {});
+                  await deleteReactionRoleMessage(
+                    client,
+                    guildId,
+                    panel.messageId
+                  ).catch(() => {});
+
                   continue;
                 }
-                
-                const msg = await channel.messages.fetch(panel.messageId).catch(() => null);
+
+                const msg =
+                  await channel.messages
+                    .fetch(panel.messageId)
+                    .catch(() => null);
+
                 if (!msg) {
-                  await deleteReactionRoleMessage(client, guildId, panel.messageId).catch(() => {});
+                  await deleteReactionRoleMessage(
+                    client,
+                    guildId,
+                    panel.messageId
+                  ).catch(() => {});
+
                   continue;
                 }
+
                 validPanels.push(panel);
               }
-              
+
               if (validPanels.length === 0) {
                 await interaction.respond([]);
                 return;
               }
-              
+
               const choices = await Promise.all(
-                validPanels.slice(0, 25).map(async panel => {
-                  try {
-                    const channel = guild.channels.cache.get(panel.channelId);
-                    if (!channel) return null;
-                    
-                    const msg = await channel.messages.fetch(panel.messageId).catch(() => null);
-                    if (!msg) return null;
-                    
-                    const title = msg?.embeds?.[0]?.title ?? 'Untitled Panel';
-                    const channelName = channel?.name ?? 'unknown';
-                    
-                    return {
-                      name: `${title} (${channelName})`.substring(0, 100),
-                      value: panel.messageId
-                    };
-                  } catch (e) {
-                    return null;
-                  }
-                })
+                validPanels
+                  .slice(0, 25)
+                  .map(async (panel) => {
+                    try {
+                      const channel =
+                        guild.channels.cache.get(
+                          panel.channelId
+                        );
+
+                      if (!channel) {
+                        return null;
+                      }
+
+                      const msg =
+                        await channel.messages
+                          .fetch(panel.messageId)
+                          .catch(() => null);
+
+                      if (!msg) {
+                        return null;
+                      }
+
+                      const title =
+                        msg?.embeds?.[0]?.title ??
+                        'Untitled Panel';
+
+                      const channelName =
+                        channel?.name ?? 'unknown';
+
+                      return {
+                        name: `${title} (${channelName})`.substring(
+                          0,
+                          100
+                        ),
+                        value: panel.messageId,
+                      };
+                    } catch (e) {
+                      return null;
+                    }
+                  })
               );
-              
-              const validChoices = choices.filter(c => c !== null);
+
+              const validChoices =
+                choices.filter(
+                  (choice) => choice !== null
+                );
+
               await interaction.respond(validChoices);
             } catch (error) {
-              logger.error('Error handling reactroles autocomplete:', {
-                error: error.message,
-                guildId: interaction.guildId,
-                commandName: interaction.commandName
-              });
+              logger.error(
+                'Error handling reactroles autocomplete:',
+                {
+                  error: error.message,
+                  guildId: interaction.guildId,
+                  commandName: interaction.commandName,
+                }
+              );
+
               await interaction.respond([]);
             }
+
+            return;
           }
-        } else if (interaction.isButton()) {
-          if (interaction.customId.startsWith('shared_todo_')) {
-            const parts = interaction.customId.split('_');
-            const buttonType = parts.slice(0, 3).join('_');
+
+          return;
+        }
+
+        /*
+         * =========================
+         * BUTTONS
+         * =========================
+         */
+        if (interaction.isButton()) {
+          if (
+            interaction.customId.startsWith(
+              'shared_todo_'
+            )
+          ) {
+            const parts =
+              interaction.customId.split('_');
+
+            const buttonType = parts
+              .slice(0, 3)
+              .join('_');
+
             const listId = parts[3];
-            const button = client.buttons.get(buttonType);
+
+            const button =
+              client.buttons.get(buttonType);
 
             if (button) {
               try {
-                await button.execute(interaction, client, [listId]);
+                await button.execute(
+                  interaction,
+                  client,
+                  [listId]
+                );
               } catch (error) {
-                await handleInteractionError(interaction, error, withTraceContext({
-                  type: 'button',
-                  customId: interaction.customId,
-                  handler: 'todo'
-                }, interactionTraceContext));
+                await handleInteractionError(
+                  interaction,
+                  error,
+                  withTraceContext(
+                    {
+                      type: 'button',
+                      customId: interaction.customId,
+                      handler: 'todo',
+                    },
+                    interactionTraceContext
+                  )
+                );
               }
             } else {
               throw createError(
                 `No button handler found for ${buttonType}`,
                 ErrorTypes.CONFIGURATION,
                 'This button is not available.',
-                withTraceContext({ buttonType }, interactionTraceContext)
+                withTraceContext(
+                  { buttonType },
+                  interactionTraceContext
+                )
               );
             }
+
             return;
           }
 
-          const [customId, ...args] = interaction.customId.split(':');
-          const button = client.buttons.get(customId);
+          const [customId, ...args] =
+            interaction.customId.split(':');
+
+          const button =
+            client.buttons.get(customId);
 
           if (!button) {
-            if (!interaction.customId.includes(':') || isCollectorManagedComponent(customId)) {
+            if (
+              !interaction.customId.includes(':') ||
+              isCollectorManagedComponent(customId)
+            ) {
               return;
             }
 
@@ -346,78 +651,158 @@ export default {
               `No button handler found for ${customId}`,
               ErrorTypes.CONFIGURATION,
               'This button is not available.',
-              withTraceContext({ customId }, interactionTraceContext)
+              withTraceContext(
+                { customId },
+                interactionTraceContext
+              )
             );
           }
 
           try {
-            await button.execute(interaction, client, args);
-          } catch (error) {
-            await handleInteractionError(interaction, error, withTraceContext({
-              type: 'button',
-              customId: interaction.customId,
-              handler: 'general'
-            }, interactionTraceContext));
-          }
-      } else if (interaction.isStringSelectMenu()) {
-
-    console.log(
-        `[JOB_DEBUG] SELECT RECEIVED | customId=${interaction.customId} | values=${JSON.stringify(interaction.values)}`
-    );
-
-    const [customId, ...args] = interaction.customId.split(':');
-
-    console.log(
-        `[JOB_DEBUG] LOOKING FOR HANDLER | customId=${customId}`
-    );
-
-    const selectMenu = client.selectMenus.get(customId);
-
-    console.log(
-        `[JOB_DEBUG] HANDLER RESULT | ${selectMenu ? 'FOUND' : 'NOT FOUND'} | customId=${customId}`
-    );
-
-    if (!selectMenu) {
-        if (!interaction.customId.includes(':') || isCollectorManagedComponent(customId)) {
-            console.log(
-                `[JOB_DEBUG] No handler, returning | customId=${customId}`
+            await button.execute(
+              interaction,
+              client,
+              args
             );
-            return;
+          } catch (error) {
+            await handleInteractionError(
+              interaction,
+              error,
+              withTraceContext(
+                {
+                  type: 'button',
+                  customId: interaction.customId,
+                  handler: 'general',
+                },
+                interactionTraceContext
+              )
+            );
+          }
+
+          return;
         }
 
-        throw createError(
-            `No select menu handler found for ${customId}`,
-            ErrorTypes.CONFIGURATION,
-            'This select menu is not available.',
-            withTraceContext({ customId }, interactionTraceContext)
-        );
-    }
+        /*
+         * =========================
+         * STRING SELECT MENUS
+         * =========================
+         */
+        if (interaction.isStringSelectMenu()) {
+          console.log(
+            `[JOB_DEBUG] SELECT RECEIVED | customId=${interaction.customId} | values=${JSON.stringify(
+              interaction.values
+            )}`
+          );
 
-    try {
-        console.log(
-            `[JOB_DEBUG] STARTING HANDLER | ${customId}`
-        );
+          const [customId, ...args] =
+            interaction.customId.split(':');
 
-        await selectMenu.execute(interaction, client, args);
+          console.log(
+            `[JOB_DEBUG] LOOKING FOR HANDLER | customId=${customId}`
+          );
 
-        console.log(
-            `[JOB_DEBUG] HANDLER FINISHED | ${customId}`
-        );
+          const selectMenu =
+            client.selectMenus.get(customId);
 
-    } catch (error) {
+          console.log(
+            `[JOB_DEBUG] HANDLER RESULT | ${
+              selectMenu ? 'FOUND' : 'NOT FOUND'
+            } | customId=${customId}`
+          );
 
-        console.error(
-            `[JOB_DEBUG] HANDLER ERROR | ${customId}`,
-            error
+          if (!selectMenu) {
+            if (
+              !interaction.customId.includes(':') ||
+              isCollectorManagedComponent(customId)
+            ) {
+              console.log(
+                `[JOB_DEBUG] No handler, returning | customId=${customId}`
+              );
+
+              return;
+            }
+
+            throw createError(
+              `No select menu handler found for ${customId}`,
+              ErrorTypes.CONFIGURATION,
+              'This select menu is not available.',
+              withTraceContext(
+                { customId },
+                interactionTraceContext
+              )
+            );
+          }
+
+          try {
+            console.log(
+              `[JOB_DEBUG] STARTING HANDLER | ${customId}`
+            );
+
+            await selectMenu.execute(
+              interaction,
+              client,
+              args
+            );
+
+            console.log(
+              `[JOB_DEBUG] HANDLER FINISHED | ${customId}`
+            );
+          } catch (error) {
+            console.error(
+              `[JOB_DEBUG] HANDLER ERROR | ${customId}`,
+              error
+            );
+
+            await handleInteractionError(
+              interaction,
+              error,
+              withTraceContext(
+                {
+                  type: 'select_menu',
+                  customId: interaction.customId,
+                },
+                interactionTraceContext
+              )
+            );
+          }
+
+          return;
+        }
+      } catch (error) {
+        logger.error(
+          'Unhandled error in InteractionCreate:',
+          {
+            error: error?.message || error,
+            stack: error?.stack,
+            guildId: interaction.guildId,
+            userId: interaction.user?.id,
+            interactionId: interaction.id,
+            interactionType: interaction.type,
+          }
         );
 
         await handleInteractionError(
-            interaction,
-            error,
-            withTraceContext({
-                type: 'select_menu',
-                customId: interaction.customId
-            }, interactionTraceContext)
-        );
-    }
-}
+          interaction,
+          error,
+          withTraceContext(
+            {
+              type: 'interaction_create',
+              customId: interaction.customId,
+              commandName: interaction.commandName,
+            },
+            interactionTraceContext
+          )
+        ).catch((handlerError) => {
+          logger.error(
+            'Failed to handle InteractionCreate error:',
+            {
+              error:
+                handlerError?.message ||
+                handlerError,
+            }
+          );
+        });
+      }
+    });
+  },
+};
