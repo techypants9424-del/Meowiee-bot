@@ -1,12 +1,3 @@
-export default {
-    data: new SlashCommandBuilder()
-        .setName('job')
-        .setDescription('Browse available MeowCoins jobs'),
-
-    execute: withErrorHandling(async (interaction, config, client) => {
-        // your existing code here
-    }, { command: 'job' }),
-};
 import {
     SlashCommandBuilder,
     ActionRowBuilder,
@@ -17,6 +8,7 @@ import {
 import { createEmbed } from '../../utils/embeds.js';
 import { withErrorHandling } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
+import { getOpenJobs } from '../../utils/databaseJob.js';
 
 export default {
     data: new SlashCommandBuilder()
@@ -36,24 +28,8 @@ export default {
             return;
         }
 
-        // Get all open hires
-        const keys = await client.db.list('hire:');
-
-        let hires = [];
-
-        if (Array.isArray(keys)) {
-            for (const key of keys) {
-                const hire = await client.db.get(key, null);
-
-                if (
-                    hire &&
-                    hire.status === 'open' &&
-                    hire.guildId === guildId
-                ) {
-                    hires.push(hire);
-                }
-            }
-        }
+        // Get all open jobs
+        const hires = await getOpenJobs(client, guildId);
 
         if (hires.length === 0) {
             const embed = createEmbed({
@@ -71,21 +47,23 @@ export default {
         }
 
         // Newest jobs first
-        hires.sort((a, b) => b.createdAt - a.createdAt);
+        hires.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
         // Discord select menus can only have 25 options
-        hires = hires.slice(0, 25);
+        const jobs = hires.slice(0, 25);
 
-        const options = hires.map((hire) => {
-            const reason =
-                hire.reason.length > 90
-                    ? `${hire.reason.substring(0, 87)}...`
-                    : hire.reason;
+        const options = jobs.map((hire) => {
+            const reason = hire.reason || 'Untitled job';
+
+            const shortenedReason =
+                reason.length > 90
+                    ? `${reason.substring(0, 87)}...`
+                    : reason;
 
             return new StringSelectMenuOptionBuilder()
-                .setLabel(reason)
+                .setLabel(shortenedReason)
                 .setDescription(
-                    `${hire.coins.toLocaleString()} MeowCoins • Job #${hire.id.slice(-6)}`
+                    `${Number(hire.coins || 0).toLocaleString()} MeowCoins • Job #${hire.id.slice(-6)}`
                 )
                 .setValue(hire.id);
         });
@@ -95,7 +73,8 @@ export default {
             .setPlaceholder('Select a job to view it')
             .addOptions(options);
 
-        const row = new ActionRowBuilder().addComponents(menu);
+        const row = new ActionRowBuilder()
+            .addComponents(menu);
 
         const embed = createEmbed({
             title: '💼 MeowCoins Job Board',
