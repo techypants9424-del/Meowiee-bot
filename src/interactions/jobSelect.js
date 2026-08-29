@@ -6,6 +6,7 @@ import {
 
 import { createEmbed } from '../utils/embeds.js';
 import { InteractionHelper } from '../utils/interactionHelper.js';
+import { getJob } from '../utils/databaseJob.js';
 
 export default {
     customId: 'job_select',
@@ -14,41 +15,38 @@ export default {
         const hireId = interaction.values?.[0];
 
         if (!hireId) {
-            await InteractionHelper.safeUpdate(interaction, {
+            await InteractionHelper.safeReply(interaction, {
                 content: '❌ Invalid job selection.',
-                components: [],
+                ephemeral: true,
             });
             return;
         }
 
-        const hireKey = `hire:${hireId}`;
-        const hire = await client.db.get(hireKey, null);
+        const job = await getJob(client, hireId);
 
-        if (!hire) {
-            await InteractionHelper.safeUpdate(interaction, {
+        if (!job) {
+            await InteractionHelper.safeReply(interaction, {
                 content: '❌ This job no longer exists.',
-                components: [],
+                ephemeral: true,
             });
             return;
         }
 
-        // Make sure the job is still available
-        if (hire.status !== 'open') {
-            await InteractionHelper.safeUpdate(interaction, {
+        if (job.status !== 'open') {
+            await InteractionHelper.safeReply(interaction, {
                 content:
                     '❌ This job is no longer available.\n\n' +
-                    'Someone may have already accepted it.',
-                components: [],
+                    `Status: **${job.status}**`,
+                ephemeral: true,
             });
             return;
         }
 
-        // Don't let the person hire themselves
-        if (hire.employerId === interaction.user.id) {
-            await InteractionHelper.safeUpdate(interaction, {
-                content:
-                    '❌ You cannot accept your own job!',
-                components: [],
+        // Employer cannot accept their own job
+        if (job.employerId === interaction.user.id) {
+            await InteractionHelper.safeReply(interaction, {
+                content: '❌ You cannot accept your own job.',
+                ephemeral: true,
             });
             return;
         }
@@ -56,25 +54,19 @@ export default {
         const embed = createEmbed({
             title: '💼 Job Details',
             description:
-                `📝 **Job:**\n${hire.reason}\n\n` +
-                `🪙 **Reward:** **${hire.coins.toLocaleString()} MeowCoins**\n` +
-                `👤 **Posted by:** <@${hire.employerId}>\n` +
+                `📝 **Job:**\n${job.reason}\n\n` +
+                `🪙 **Reward:** **${Number(job.coins).toLocaleString()} MeowCoins**\n` +
                 `📌 **Status:** Open\n\n` +
-                `If you can complete this job, click **Accept Job** below.`,
+                `👤 **Posted by:** <@${job.employerId}>\n\n` +
+                `Click **Accept Job** if you want to complete this job.`,
         });
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setCustomId(`job_accept:${hire.id}`)
+                .setCustomId(`job_accept:${job.id}`)
                 .setLabel('Accept Job')
                 .setEmoji('✅')
-                .setStyle(ButtonStyle.Success),
-
-            new ButtonBuilder()
-                .setCustomId(`job_cancel:${hire.id}`)
-                .setLabel('Close')
-                .setEmoji('❌')
-                .setStyle(ButtonStyle.Secondary)
+                .setStyle(ButtonStyle.Success)
         );
 
         await InteractionHelper.safeUpdate(interaction, {
