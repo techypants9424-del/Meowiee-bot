@@ -359,113 +359,65 @@ export default {
               handler: 'general'
             }, interactionTraceContext));
           }
-        } else if (interaction.isStringSelectMenu()) {
-          const [customId, ...args] = interaction.customId.split(':');
-          const selectMenu = client.selectMenus.get(customId);
+      } else if (interaction.isStringSelectMenu()) {
 
-          if (!selectMenu) {
-            if (!interaction.customId.includes(':') || isCollectorManagedComponent(customId)) {
-              return;
-            }
+    console.log(
+        `[JOB_DEBUG] SELECT RECEIVED | customId=${interaction.customId} | values=${JSON.stringify(interaction.values)}`
+    );
 
-            throw createError(
-              `No select menu handler found for ${customId}`,
-              ErrorTypes.CONFIGURATION,
-              'This select menu is not available.',
-              withTraceContext({ customId }, interactionTraceContext)
+    const [customId, ...args] = interaction.customId.split(':');
+
+    console.log(
+        `[JOB_DEBUG] LOOKING FOR HANDLER | customId=${customId}`
+    );
+
+    const selectMenu = client.selectMenus.get(customId);
+
+    console.log(
+        `[JOB_DEBUG] HANDLER RESULT | ${selectMenu ? 'FOUND' : 'NOT FOUND'} | customId=${customId}`
+    );
+
+    if (!selectMenu) {
+        if (!interaction.customId.includes(':') || isCollectorManagedComponent(customId)) {
+            console.log(
+                `[JOB_DEBUG] No handler, returning | customId=${customId}`
             );
-          }
-
-          try {
-            await selectMenu.execute(interaction, client, args);
-          } catch (error) {
-            await handleInteractionError(interaction, error, withTraceContext({
-              type: 'select_menu',
-              customId: interaction.customId
-            }, interactionTraceContext));
-          }
-        } else if (interaction.isModalSubmit()) {
-          if (interaction.customId.startsWith('app_modal_')) {
-            try {
-              await handleApplicationModal(interaction);
-            } catch (error) {
-              await handleInteractionError(interaction, error, withTraceContext({
-                type: 'modal',
-                customId: interaction.customId,
-                handler: 'application'
-              }, interactionTraceContext));
-            }
             return;
-          }
-
-          if (
-            interaction.customId.startsWith('app_review_')
-            || interaction.customId.startsWith('jtc_')
-            || interaction.customId.startsWith('config_wizard_modal:')
-            || interaction.customId.startsWith('log_dash_channel_modal:')
-            || interaction.customId.startsWith('log_dash_filter_modal:')
-          ) {
-            logger.debug(`Skipping modal handler lookup for inline-awaited modal: ${interaction.customId}`, {
-              event: 'interaction.modal.inline_skipped',
-              traceId: interactionTraceContext.traceId
-            });
-            return;
-          }
-
-          const [customId, ...args] = interaction.customId.split(':');
-          const modal = client.modals.get(customId);
-
-          if (!modal) {
-            if (!interaction.customId.includes(':')) {
-
-              return;
-            }
-
-            throw createError(
-              `No modal handler found for ${customId}`,
-              ErrorTypes.CONFIGURATION,
-              'This form is not available.',
-              withTraceContext({ customId }, interactionTraceContext)
-            );
-          }
-
-          try {
-            await modal.execute(interaction, client, args);
-          } catch (error) {
-            await handleInteractionError(interaction, error, withTraceContext({
-              type: 'modal',
-              customId: interaction.customId,
-              handler: 'general'
-            }, interactionTraceContext));
-          }
         }
-      } catch (error) {
-        logger.error('Unhandled error in interactionCreate:', {
-          event: 'interaction.unhandled_error',
-          errorCode: ErrorCodes.INTERACTION_UNHANDLED,
-          error,
-          traceId: interactionTraceContext.traceId,
-          interactionId: interaction.id,
-          guildId: interaction.guildId,
-          userId: interaction.user?.id
-        });
 
-        try {
-          await handleInteractionError(interaction, error, withTraceContext({
-            type: 'interaction',
-            commandName: interaction.commandName,
-            customId: interaction.customId,
-            source: 'interactionCreate.unhandled'
-          }, interactionTraceContext));
-        } catch (replyError) {
-          logger.error('Failed to send fallback error response:', {
-            event: 'interaction.error_response_failed',
-            errorCode: ErrorCodes.INTERACTION_RESPONSE_FAILED,
-            error: replyError,
-            traceId: interactionTraceContext.traceId
-          });
-        }
-      }
-    });
-  }
-};
+        throw createError(
+            `No select menu handler found for ${customId}`,
+            ErrorTypes.CONFIGURATION,
+            'This select menu is not available.',
+            withTraceContext({ customId }, interactionTraceContext)
+        );
+    }
+
+    try {
+        console.log(
+            `[JOB_DEBUG] STARTING HANDLER | ${customId}`
+        );
+
+        await selectMenu.execute(interaction, client, args);
+
+        console.log(
+            `[JOB_DEBUG] HANDLER FINISHED | ${customId}`
+        );
+
+    } catch (error) {
+
+        console.error(
+            `[JOB_DEBUG] HANDLER ERROR | ${customId}`,
+            error
+        );
+
+        await handleInteractionError(
+            interaction,
+            error,
+            withTraceContext({
+                type: 'select_menu',
+                customId: interaction.customId
+            }, interactionTraceContext)
+        );
+    }
+}
