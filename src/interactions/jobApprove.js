@@ -1,6 +1,6 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { createEmbed } from '../utils/embeds.js';
-import { getEconomyData, removeMoney, addMoney } from '../utils/economy.js';
+import { addMoney } from '../utils/economy.js';
 import { InteractionHelper } from '../utils/interactionHelper.js';
 
 export default {
@@ -23,13 +23,16 @@ export default {
             )
         ) {
             return InteractionHelper.safeReply(interaction, {
-                content: '❌ You need **Manage Server** permission to approve jobs.',
+                content:
+                    '❌ You need **Manage Server** permission to approve jobs.',
                 ephemeral: true,
             });
         }
 
-        await InteractionHelper.safeDefer(interaction);
+        const deferred = await InteractionHelper.safeDefer(interaction);
+        if (!deferred) return;
 
+        // Get hire
         const hireKey = `hire:${hireId}`;
         const hire = await client.db.get(hireKey, null);
 
@@ -39,13 +42,15 @@ export default {
             });
         }
 
-        // Prevent approving twice
+        // Already completed
         if (hire.status === 'completed') {
             return InteractionHelper.safeEditReply(interaction, {
-                content: '⚠️ This job has already been approved and paid.',
+                content:
+                    '⚠️ This job has already been approved and paid.',
             });
         }
 
+        // Must be accepted first
         if (hire.status !== 'accepted') {
             return InteractionHelper.safeEditReply(interaction, {
                 content:
@@ -54,14 +59,13 @@ export default {
             });
         }
 
+        // Make sure there is a worker
         if (!hire.workerId) {
             return InteractionHelper.safeEditReply(interaction, {
-                content: '❌ This job does not have a worker.',
+                content: '❌ This job does not have a worker assigned.',
             });
         }
 
-        const employerId = hire.employerId;
-        const workerId = hire.workerId;
         const reward = Number(hire.coins);
 
         if (!Number.isFinite(reward) || reward <= 0) {
@@ -71,43 +75,19 @@ export default {
         }
 
         /*
-         * Check employer's GLOBAL MeowCoins.
+         * ESCROW PAYMENT
          *
-         * We check again before transferring because the economy
-         * can change while the job is open.
-         */
-        const employerEconomy = await getEconomyData(
-            client,
-            hire.guildId,
-            employerId
-        );
-
-        if ((employerEconomy.wallet || 0) < reward) {
-            return InteractionHelper.safeEditReply(interaction, {
-                content:
-                    `❌ The employer no longer has enough MeowCoins to pay this job.\n\n` +
-                    `Required: **${reward.toLocaleString()} MeowCoins**\n` +
-                    `Available: **${(employerEconomy.wallet || 0).toLocaleString()} MeowCoins**`,
-            });
-        }
-
-        /*
-         * PAY WORKER
+         * The employer's coins were already removed
+         * when /hire was used.
          *
-         * Remove coins from employer
-         * Add coins to worker
+         * So DO NOT remove money here.
+         *
+         * We only give the locked reward to the worker.
          */
-        await removeMoney(
-            client,
-            hire.guildId,
-            employerId,
-            reward
-        );
-
         await addMoney(
             client,
             hire.guildId,
-            workerId,
+            hire.workerId,
             reward
         );
 
@@ -123,10 +103,10 @@ export default {
             title: '✅ Job Approved!',
             description:
                 `This job has been approved successfully!\n\n` +
-                `👤 **Worker:** <@${workerId}>\n` +
-                `💰 **Reward:** ${reward.toLocaleString()} MeowCoins\n` +
+                `👤 **Worker:** <@${hire.workerId}>\n` +
+                `🪙 **Reward:** ${reward.toLocaleString()} MeowCoins\n` +
                 `🛡️ **Approved by:** <@${interaction.user.id}>\n\n` +
-                `The MeowCoins have been transferred to the worker.`,
+                `The escrowed MeowCoins have been transferred to the worker. 🐱`,
             color: 'success',
         });
 
@@ -134,14 +114,14 @@ export default {
             embeds: [embed],
         });
 
-        // Also announce in the job channel
+        // Announce completion inside the job channel
         if (interaction.channel) {
             await interaction.channel.send({
                 embeds: [
                     createEmbed({
                         title: '🎉 Job Completed!',
                         description:
-                            `<@${workerId}> has been paid **${reward.toLocaleString()} MeowCoins**.\n\n` +
+                            `<@${hire.workerId}> has received **${reward.toLocaleString()} MeowCoins**!\n\n` +
                             `Thank you for completing the job! 🐱🪙`,
                         color: 'success',
                     }),
