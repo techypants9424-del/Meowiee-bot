@@ -98,6 +98,16 @@ export default {
         hire.paidAmount = reward;
 
         await client.db.set(hireKey, hire);
+        // Automatically delete the job channel after approval
+if (hire.channelId) {
+    const jobChannel = await client.channels
+        .fetch(hire.channelId)
+        .catch(() => null);
+
+    if (jobChannel) {
+        await jobChannel.delete('Job completed and approved').catch(() => {});
+    }
+}
 
         const embed = createEmbed({
             title: '✅ Job Approved!',
@@ -114,19 +124,5 @@ export default {
             embeds: [embed],
         });
 
-        // Announce completion inside the job channel
-        if (interaction.channel) {
-            await interaction.channel.send({
-                embeds: [
-                    createEmbed({
-                        title: '🎉 Job Completed!',
-                        description:
-                            `<@${hire.workerId}> has received **${reward.toLocaleString()} MeowCoins**!\n\n` +
-                            `Thank you for completing the job! 🐱🪙`,
-                        color: 'success',
-                    }),
-                ],
-            }).catch(() => {});
-        }
     },
 };
