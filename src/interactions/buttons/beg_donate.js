@@ -9,6 +9,8 @@ export default {
 
     async execute(interaction, client, args) {
         const beggarId = args?.[0];
+        const donorId = interaction.user.id;
+        const guildId = interaction.guildId;
 
         if (!beggarId) {
             await InteractionHelper.safeReply(interaction, {
@@ -18,9 +20,7 @@ export default {
             return;
         }
 
-        const donorId = interaction.user.id;
-
-        // Don't allow the beggar to donate to themselves
+        // Prevent donating to yourself
         if (donorId === beggarId) {
             await InteractionHelper.safeReply(interaction, {
                 content: '🥺 You cannot donate to yourself!',
@@ -29,29 +29,42 @@ export default {
             return;
         }
 
-        const donorData = await getEconomyData(donorId);
-        const donorBalance = donorData?.balance ?? donorData?.money ?? 0;
+        // Get donor's economy
+        const donorData = await getEconomyData(client, guildId, donorId);
+        const donorBalance = donorData.wallet || 0;
 
-        // Check donor has enough MeowCoins
+        // Check balance
         if (donorBalance < BEG_AMOUNT) {
             await InteractionHelper.safeReply(interaction, {
-                content: `❌ You need **${BEG_AMOUNT} MeowCoins** to donate! You only have **${donorBalance}**. 🪙`,
+                content:
+                    `❌ You don't have enough MeowCoins!\n\n` +
+                    `You have **${donorBalance} MeowCoins** 🪙\n` +
+                    `You need **${BEG_AMOUNT} MeowCoins**.`,
                 ephemeral: true,
             });
             return;
         }
 
-        // Remove coins from donor
-        await removeMoney(donorId, BEG_AMOUNT);
+        // Take 10 coins from donor
+        await removeMoney(
+            client,
+            guildId,
+            donorId,
+            BEG_AMOUNT
+        );
 
-        // Give coins to beggar
-        await addMoney(beggarId, BEG_AMOUNT);
+        // Give 10 coins to beggar
+        await addMoney(
+            client,
+            guildId,
+            beggarId,
+            BEG_AMOUNT
+        );
 
         const embed = createEmbed({
             title: '🪙 Donation Received!',
             description:
-                `<@${donorId}> donated **${BEG_AMOUNT} MeowCoins** to <@${beggarId}>! 🥺💖\n\n` +
-                `The beggar now has some more MeowCoins!`,
+                `<@${donorId}> donated **${BEG_AMOUNT} MeowCoins** to <@${beggarId}>! 🥺💖`,
             color: 'success',
         });
 
