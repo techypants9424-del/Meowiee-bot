@@ -58,15 +58,15 @@ async function handleMeowieeReactions(message) {
 
     const gifs = {
       yes: [
-        'https://media1.tenor.com/m/dscrHX9CbssAAAAC/anime-ok.gif',
-        'https://media1.tenor.com/m/_2dT6aW89tkAAAAC/keppeki-danshi-aoyama-kun-clean-freak-aoyama-kun.gif',
-        'https://media1.tenor.com/m/KWpFVQPCRoYAAAAC/yes-anime.gif',
+        'https://c.tenor.com/dscrHX9CbssAAAAC/tenor.gif',
+        'https://c.tenor.com/_2dT6aW89tkAAAAC/tenor.gif',
+        'https://c.tenor.com/KWpFVQPCRoYAAAAC/tenor.gif',
       ],
 
       no: [
-        'https://media1.tenor.com/m/U_akTeYNf3oAAAAC/nope-anime.gif',
-        'https://media1.tenor.com/m/0zfqxlPxYOYAAAAC/bocchi-the-rock-bocchi.gif',
-        'https://media1.tenor.com/m/i3lUx_zoGZwAAAAC/k-on.gif',
+        'https://c.tenor.com/U_akTeYNf3oAAAAC/tenor.gif',
+        'https://c.tenor.com/0zfqxlPxYOYAAAAC/tenor.gif',
+        'https://c.tenor.com/i3lUx_zoGZwAAAAC/tenor.gif',
       ],
 
       huh: [
