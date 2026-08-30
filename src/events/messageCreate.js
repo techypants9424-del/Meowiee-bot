@@ -12,6 +12,7 @@ import { getCommandPrefix, getBotMessage, isBotOwner, isCommandCategoryEnabled, 
 import { enforceAbuseProtection, formatCooldownDuration } from '../utils/abuseProtection.js';
 import { createEmbed } from '../utils/embeds.js';
 import { isCommandEnabled } from '../services/commandAccessService.js';
+import { handleMeowEvent } from '../services/meowEventService.js';
 import {
   getCountingGameConfig,
   saveCountingGameConfig,
@@ -45,6 +46,8 @@ if (reactionProcessed) {
 }
 
 await handleWorkTask(message, client);
+
+await handleMeowEvent(message, client);
 
 await handleLeveling(message, client);
     } catch (error) {
