@@ -60,15 +60,21 @@ export default {
 
         const reward = Number(hire.coins);
 
-        // Refund the escrowed MeowCoins
-        if (Number.isFinite(reward) && reward > 0) {
-            await addMoney(
-                client,
-                hire.guildId,
-                hire.employerId,
-                reward
-            );
-        }
+if (!Number.isFinite(reward) || reward <= 0) {
+    await InteractionHelper.safeReply(interaction, {
+        content: '❌ Invalid refund amount.',
+        ephemeral: true,
+    });
+    return;
+}
+
+// Refund the escrowed MeowCoins
+await addMoney(
+    client,
+    hire.guildId,
+    hire.employerId,
+    reward
+);
 
         // Mark cancelled
         hire.status = 'cancelled';
