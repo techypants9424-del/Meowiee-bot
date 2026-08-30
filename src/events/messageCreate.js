@@ -70,15 +70,15 @@ async function handleMeowieeReactions(message) {
       ],
 
       huh: [
-        'https://media1.tenor.com/m/2ZuUWp5LDfIAAAAC/konata-lucky-star.gif',
-        'https://media1.tenor.com/m/O-F65peFwqIAAAAC/gs-cingrey.gif',
-        'https://media1.tenor.com/m/0ys1EkmlK48AAAAC/esiledoodles-esiledoodles-cora.gif',
+        'https://c.tenor.com/2ZuUWp5LDfIAAAAC/tenor.gif',
+        'https://c.tenor.com/O-F65peFwqIAAAAC/tenor.gif',
+        'https://c.tenor.com/0ys1EkmlK48AAAAC/tenor.gif',
       ],
 
       sorry: [
         'https://media.tenor.com/bFIY3KTS3-EAAAAi/vtuber-nuwa-ceres.gif',
-        'https://media1.tenor.com/m/mQRY9rnQFc8AAAAC/anime-fox.gif',
-        'https://media1.tenor.com/m/Up7hRFmFY9AAAAAd/anime-sad-anime-pout.gif',
+        'https://c.tenor.com/mQRY9rnQFc8AAAAC/tenor.gif',
+        'https://c.tenor.com/Up7hRFmFY9AAAAAd/tenor.gif',
       ],
     };
 
