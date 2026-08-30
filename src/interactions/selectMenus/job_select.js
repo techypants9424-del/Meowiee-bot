@@ -4,10 +4,9 @@ import {
     ButtonStyle,
 } from 'discord.js';
 
-import { createEmbed } from '../utils/embeds.js';
-import { InteractionHelper } from '../utils/interactionHelper.js';
-import { getJob } from '../utils/databaseJob.js';
-
+import { createEmbed } from '../../utils/embeds.js';
+import { InteractionHelper } from '../../utils/interactionHelper.js';
+import { getJob } from '../../utils/databaseJob.js';
 export default {
     name: 'job_select',
 
