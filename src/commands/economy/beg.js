@@ -1,19 +1,21 @@
 import {
+    SlashCommandBuilder,
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
 } from 'discord.js';
 
 import { createEmbed } from '../../utils/embeds.js';
-import { getEconomyData, addMoney, removeMoney } from '../../utils/economy.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
 const BEG_AMOUNT = 10;
 
 export default {
-    name: 'beg',
+    data: new SlashCommandBuilder()
+        .setName('beg')
+        .setDescription('Beg other users for 10 MeowCoins'),
 
-    async execute(interaction, client) {
+    execute: async (interaction, client) => {
         const ready = await InteractionHelper.safeDefer(interaction);
 
         if (!ready) {
@@ -36,9 +38,8 @@ export default {
             .setEmoji('🪙')
             .setStyle(ButtonStyle.Success);
 
-        const row = new ActionRowBuilder().addComponents(
-            donateButton
-        );
+        const row = new ActionRowBuilder()
+            .addComponents(donateButton);
 
         await InteractionHelper.safeEditReply(interaction, {
             embeds: [embed],
