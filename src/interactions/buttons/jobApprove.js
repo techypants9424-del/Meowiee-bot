@@ -50,8 +50,8 @@ export default {
             });
         }
 
-        // Must be accepted first
-  if (hire.status !== 'in_progress') {
+        // Must be in progress
+        if (hire.status !== 'in_progress') {
             return InteractionHelper.safeEditReply(interaction, {
                 content:
                     `❌ This job cannot be approved.\n` +
@@ -77,13 +77,17 @@ export default {
         /*
          * ESCROW PAYMENT
          *
-         * The employer's coins were already removed
-         * when /hire was used.
-         *
-         * So DO NOT remove money here.
+         * Employer's coins were already removed
+         * when /hire was created.
          *
          * We only give the locked reward to the worker.
          */
+        console.log('[JOB_APPROVE] PAYMENT:', {
+            workerId: hire.workerId,
+            guildId: hire.guildId,
+            reward,
+        });
+
         await addMoney(
             client,
             hire.guildId,
@@ -98,17 +102,24 @@ export default {
         hire.paidAmount = reward;
 
         await client.db.set(hireKey, hire);
+
+        // Save channel ID before deleting the channel
+        const channelId = hire.channelId;
+
         // Automatically delete the job channel after approval
-if (hire.channelId) {
-    const jobChannel = await client.channels
-        .fetch(hire.channelId)
-        .catch(() => null);
+        if (channelId) {
+            const jobChannel = await client.channels
+                .fetch(channelId)
+                .catch(() => null);
 
-    if (jobChannel) {
-        await jobChannel.delete('Job completed and approved').catch(() => {});
-    }
-}
+            if (jobChannel) {
+                await jobChannel
+                    .delete('Job completed and approved')
+                    .catch(() => {});
+            }
+        }
 
+        // Approval confirmation
         const embed = createEmbed({
             title: '✅ Job Approved!',
             description:
@@ -123,6 +134,5 @@ if (hire.channelId) {
         await InteractionHelper.safeEditReply(interaction, {
             embeds: [embed],
         });
-
     },
 };
