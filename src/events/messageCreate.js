@@ -1,4 +1,4 @@
-import { Events } from 'discord.js';
+import { Events, EmbedBuilder } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { getLevelingConfig, getUserLevelData } from '../services/leveling/leveling.js';
 import { addXp } from '../services/leveling/xpSystem.js';
@@ -32,11 +32,18 @@ export default {
 
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
 
-      const countingProcessed = await handleCountingGame(message, client);
-      if (countingProcessed) {
-        return;
-      }
+   const countingProcessed = await handleCountingGame(message, client);
+if (countingProcessed) {
+  return;
+}
+
 await handlePrefixCommand(message, client);
+
+const reactionProcessed = await handleMeowieeReactions(message);
+if (reactionProcessed) {
+  return;
+}
+
 await handleWorkTask(message, client);
 
 await handleLeveling(message, client);
@@ -45,6 +52,78 @@ await handleLeveling(message, client);
     }
   }
 };
+async function handleMeowieeReactions(message) {
+  try {
+    const word = message.content.trim().toLowerCase();
+
+    const gifs = {
+      yes: [
+        'https://media1.tenor.com/m/dscrHX9CbssAAAAC/anime-ok.gif',
+        'https://media1.tenor.com/m/_2dT6aW89tkAAAAC/keppeki-danshi-aoyama-kun-clean-freak-aoyama-kun.gif',
+        'https://media1.tenor.com/m/KWpFVQPCRoYAAAAC/yes-anime.gif',
+      ],
+
+      no: [
+        'https://media1.tenor.com/m/U_akTeYNf3oAAAAC/nope-anime.gif',
+        'https://media1.tenor.com/m/0zfqxlPxYOYAAAAC/bocchi-the-rock-bocchi.gif',
+        'https://media1.tenor.com/m/i3lUx_zoGZwAAAAC/k-on.gif',
+      ],
+
+      huh: [
+        'https://media1.tenor.com/m/2ZuUWp5LDfIAAAAC/konata-lucky-star.gif',
+        'https://media1.tenor.com/m/O-F65peFwqIAAAAC/gs-cingrey.gif',
+        'https://media1.tenor.com/m/0ys1EkmlK48AAAAC/esiledoodles-esiledoodles-cora.gif',
+      ],
+
+      sorry: [
+        'https://media.tenor.com/bFIY3KTS3-EAAAAi/vtuber-nuwa-ceres.gif',
+        'https://media1.tenor.com/m/mQRY9rnQFc8AAAAC/anime-fox.gif',
+        'https://media1.tenor.com/m/Up7hRFmFY9AAAAAd/anime-sad-anime-pout.gif',
+      ],
+    };
+
+    // Only react to exactly:
+    // yes
+    // no
+    // huh
+    // sorry
+    if (!gifs[word]) {
+      return false;
+    }
+
+    // Pick one of the 3 GIFs randomly
+    const randomGif =
+      gifs[word][Math.floor(Math.random() * gifs[word].length)];
+
+    // Display name of the user
+    const displayName =
+      message.member?.displayName ||
+      message.author.globalName ||
+      message.author.username;
+
+    // User avatar
+    const avatar = message.author.displayAvatarURL({
+      extension: 'png',
+      size: 128,
+    });
+
+    const embed = new EmbedBuilder()
+      .setAuthor({
+        name: `${displayName} says ${word}!`,
+        iconURL: avatar,
+      })
+      .setImage(randomGif);
+
+    await message.channel.send({
+      embeds: [embed],
+    });
+
+    return true;
+  } catch (error) {
+    logger.error('Error handling Meowiee word reaction:', error);
+    return false;
+  }
+}
 async function handleWorkTask(message, client) {
   try {
     const guildId = message.guild.id;
