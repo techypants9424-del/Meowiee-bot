@@ -153,7 +153,6 @@ async execute(interaction, client, args) {
         hire.acceptedAt = Date.now();
 
         await client.db.set(hireKey, hire);
-
         // --------------------------------------------------
         // JOB CHANNEL MESSAGE
         // --------------------------------------------------
