@@ -169,13 +169,19 @@ export default {
                 `⚠️ Keep all job-related messages and proof inside this channel.`,
         });
 
-        const controls = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`job_cancel:${hire.id}`)
-                .setLabel('Cancel Job')
-                .setEmoji('❌')
-                .setStyle(ButtonStyle.Danger)
-        );
+  const controls = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+        .setCustomId(`job_approve:${hire.id}`)
+        .setLabel('Approve Job')
+        .setEmoji('✅')
+        .setStyle(ButtonStyle.Success),
+
+    new ButtonBuilder()
+        .setCustomId(`job_cancel:${hire.id}`)
+        .setLabel('Cancel Job')
+        .setEmoji('❌')
+        .setStyle(ButtonStyle.Danger)
+);
 
         await jobChannel.send({
             content: `<@${employer.id}> <@${worker.id}>`,
