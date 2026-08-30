@@ -146,18 +146,16 @@ async execute(interaction, client, args) {
         // --------------------------------------------------
         // UPDATE JOB
         // --------------------------------------------------
+hire.status = 'in_progress';
+hire.workerId = worker.id;
+hire.channelId = jobChannel.id;
+hire.acceptedAt = Date.now();
 
-        hire.status = 'in_progress';
-        hire.workerId = worker.id;
-        hire.channelId = jobChannel.id;
-        hire.acceptedAt = Date.now();
+// --------------------------------------------------
+// JOB CHANNEL MESSAGE
+// --------------------------------------------------
 
-        await client.db.set(hireKey, hire);
-        // --------------------------------------------------
-        // JOB CHANNEL MESSAGE
-        // --------------------------------------------------
-
-        const jobEmbed = createEmbed({
+const jobEmbed = createEmbed({
             title: '💼 MeowCoins Job',
             description:
                 `A job has been accepted!\n\n` +
@@ -188,11 +186,13 @@ async execute(interaction, client, args) {
         .setStyle(ButtonStyle.Danger)
 );
 
-        await jobChannel.send({
-            content: `<@${employer.id}> <@${worker.id}>`,
-            embeds: [jobEmbed],
-            components: [controls],
-        });
+       await jobChannel.send({
+    content: `<@${employer.id}> <@${worker.id}>`,
+    embeds: [jobEmbed],
+    components: [controls],
+});
+
+await client.db.set(hireKey, hire);
 
         // --------------------------------------------------
         // CONFIRM TO WORKER
