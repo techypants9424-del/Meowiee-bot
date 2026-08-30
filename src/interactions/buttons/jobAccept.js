@@ -6,8 +6,8 @@ import {
     ButtonStyle,
 } from 'discord.js';
 
-import { createEmbed } from '../utils/embeds.js';
-import { InteractionHelper } from '../utils/interactionHelper.js';
+import { createEmbed } from '../../utils/embeds.js';
+import { InteractionHelper } from '../../utils/interactionHelper.js';
 
 export default {
     name: 'job_accept',
