@@ -52,9 +52,10 @@ await handleLeveling(message, client);
     }
   }
 };
+
 async function handleMeowieeReactions(message) {
   try {
-    const word = message.content.trim().toLowerCase();
+    const content = message.content.toLowerCase();
 
     const gifs = {
       yes: [
@@ -82,18 +83,20 @@ async function handleMeowieeReactions(message) {
       ],
     };
 
-    // Only react to exactly:
-    // yes
-    // no
-    // huh
-    // sorry
-    if (!gifs[word]) {
+    // Find a reaction word anywhere in the message
+    const matchedWord = Object.keys(gifs).find((word) => {
+      const regex = new RegExp(`\\b${word}\\b`, 'i');
+      return regex.test(content);
+    });
+
+    // No reaction word found
+    if (!matchedWord) {
       return false;
     }
 
     // Pick one of the 3 GIFs randomly
     const randomGif =
-      gifs[word][Math.floor(Math.random() * gifs[word].length)];
+      gifs[matchedWord][Math.floor(Math.random() * gifs[matchedWord].length)];
 
     // Display name of the user
     const displayName =
@@ -109,7 +112,7 @@ async function handleMeowieeReactions(message) {
 
     const embed = new EmbedBuilder()
       .setAuthor({
-        name: `${displayName} says ${word}!`,
+        name: `${displayName} says ${matchedWord}!`,
         iconURL: avatar,
       })
       .setImage(randomGif);
@@ -124,6 +127,7 @@ async function handleMeowieeReactions(message) {
     return false;
   }
 }
+
 async function handleWorkTask(message, client) {
   try {
     const guildId = message.guild.id;
