@@ -10,10 +10,16 @@ import { createEmbed } from '../../utils/embeds.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
 export default {
-    name: 'job_accept',
+    
+     name: 'job_accept',
+async execute(interaction, client, args) {
+    const ready = await InteractionHelper.safeDefer(interaction);
 
-    async execute(interaction, client, args) {
-        const hireId = args?.[0];
+    if (!ready) {
+        return;
+    }
+
+    const hireId = args?.[0];
 
         if (!hireId) {
             await InteractionHelper.safeReply(interaction, {
@@ -204,9 +210,9 @@ export default {
                 `Complete the job and keep your proof in that channel.`,
         });
 
-        await InteractionHelper.safeUpdate(interaction, {
-            embeds: [confirmationEmbed],
-            components: [],
-        });
+      await InteractionHelper.safeEditReply(interaction, { 
+    embeds: [confirmationEmbed], 
+    components: [], 
+});
     },
 };
