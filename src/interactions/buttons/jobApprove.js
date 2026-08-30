@@ -1,10 +1,10 @@
 import { PermissionFlagsBits } from 'discord.js';
-import { createEmbed } from '../utils/embeds.js';
-import { addMoney } from '../utils/economy.js';
-import { InteractionHelper } from '../utils/interactionHelper.js';
+import { createEmbed } from '../../utils/embeds.js';
+import { addMoney } from '../../utils/economy.js';
+import { InteractionHelper } from '../../utils/interactionHelper.js';
 
 export default {
-    id: 'jobApprove',
+    name: 'job_approve',
 
     async execute(interaction, client, args) {
         const hireId = args[0];
@@ -51,7 +51,7 @@ export default {
         }
 
         // Must be accepted first
-        if (hire.status !== 'accepted') {
+  if (hire.status !== 'in_progress') {
             return InteractionHelper.safeEditReply(interaction, {
                 content:
                     `❌ This job cannot be approved.\n` +
