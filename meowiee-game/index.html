@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    >
+
+    <title>Meowiee Work</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <main class="game-container">
+
+        <!-- Header -->
+        <header class="game-header">
+            <div>
+                <h1>🐱 Meowiee's Job</h1>
+                <p id="taskText">
+                    Take Meowiee to the correct shop!
+                </p>
+            </div>
+
+            <div class="timer-box">
+                ⏱️ <span id="timer">5:00</span>
+            </div>
+        </header>
+
+
+        <!-- Game Area -->
+        <section id="gameArea" class="game-area">
+
+            <!-- Shops -->
+            <div
+                class="shop"
+                id="shop-food"
+                data-shop="food"
+            >
+                <div class="shop-icon">🍔</div>
+                <span>Food Shop</span>
+            </div>
+
+            <div
+                class="shop"
+                id="shop-cafe"
+                data-shop="cafe"
+            >
+                <div class="shop-icon">☕</div>
+                <span>Café</span>
+            </div>
+
+            <div
+                class="shop"
+                id="shop-toy"
+                data-shop="toy"
+            >
+                <div class="shop-icon">🧸</div>
+                <span>Toy Shop</span>
+            </div>
+
+            <div
+                class="shop"
+                id="shop-game"
+                data-shop="game"
+            >
+                <div class="shop-icon">🎮</div>
+                <span>Game Shop</span>
+            </div>
+
+            <div
+                class="shop"
+                id="shop-book"
+                data-shop="book"
+            >
+                <div class="shop-icon">📚</div>
+                <span>Book Shop</span>
+            </div>
+
+            <div
+                class="shop"
+                id="shop-mall"
+                data-shop="mall"
+            >
+                <div class="shop-icon">🛍️</div>
+                <span>Mall</span>
+            </div>
+
+            <div
+                class="shop"
+                id="shop-clinic"
+                data-shop="clinic"
+            >
+                <div class="shop-icon">🏥</div>
+                <span>Clinic</span>
+            </div>
+
+
+            <!-- Meowiee -->
+            <div id="meowiee" class="meowiee">
+                🐱
+            </div>
+
+        </section>
+
+
+        <!-- Instructions -->
+        <section class="instructions">
+            <p class="desktop-instruction">
+                🖱️ Move your cursor around the map to guide Meowiee.
+            </p>
+
+            <p class="mobile-instruction">
+                📱 Tap around the map to guide Meowiee.
+            </p>
+        </section>
+
+
+        <!-- Status -->
+        <section id="statusPanel" class="status-panel hidden">
+
+            <div id="statusEmoji" class="status-emoji">
+                🎉
+            </div>
+
+            <h2 id="statusTitle">
+                Job Complete!
+            </h2>
+
+            <p id="statusMessage">
+                You successfully delivered Meowiee!
+            </p>
+
+            <div id="rewardText" class="reward">
+                🪙 +50 MeowCoins
+            </div>
+
+            <button id="closeButton">
+                Close
+            </button>
+
+        </section>
+
+    </main>
+
+
+    <script src="game.js"></script>
+
+</body>
+</html>
