@@ -249,9 +249,9 @@ if (letterCount < 4) {
     // ==========================================
     // SAVE PROGRESS
     // ==========================================
-    
+
     // React to the user's message to show it counted
-await message.react('✅').catch(() => {});
+    await message.react('✅').catch(() => {});
 
     await saveEconomyData(
       client,
@@ -259,9 +259,6 @@ await message.react('✅').catch(() => {});
       userId,
       data
     );
-
-t} **(${task.progress}/${task.required})**`,
-    }).catch(() => {});
 
   } catch (error) {
     logger.error('Error handling work task:', error);
