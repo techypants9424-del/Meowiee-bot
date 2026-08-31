@@ -146,7 +146,7 @@ export default {
 
             // Message requirement
             minLetters: 4,
-            maxLetters: 5,
+          
         };
 
         // Start 1-hour cooldown
@@ -174,7 +174,7 @@ export default {
 
                 `💼 **Task:** Send **${required} messages** in this server.\n` +
 
-                `📝 **Requirement:** Each message must contain **4–5 letters**.\n\n` +
+                `📝 **Requirement:** Each message must contain **4 letters**.\n\n` +
 
                 `💰 **Reward:** **${reward.toLocaleString()} MeowCoins**\n\n` +
 
