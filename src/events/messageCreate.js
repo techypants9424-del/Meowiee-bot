@@ -283,7 +283,6 @@ async function handlePrefixCommand(message, client) {
     // Music shortcuts
     const musicPrefixShortcut = commandName.toLowerCase();
    const MUSIC_PREFIX_SHORTCUTS = new Set([
-  'play',
   'leave',
   'pause',
   'resume',
