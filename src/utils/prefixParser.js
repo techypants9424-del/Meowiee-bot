@@ -74,20 +74,20 @@ function parseArguments(input) {
 
   return args;
 }
-
 export function mapArgumentsToOptions(args, commandData) {
   const options = {};
   let subcommandName = null;
   let subcommandGroupName = null;
 
-  const cmdData = commandData.toJSON ? commandData.toJSON() : commandData;
-  
+  const cmdData = commandData?.toJSON
+    ? commandData.toJSON()
+    : commandData;
+
   if (!cmdData || !cmdData.options) {
-    
     return {
       _positional: args,
       get: (name) => args[0] || null,
-      getString: (name) => args[0] || null,
+      getString: (name) => args.join(' ') || null,
       getUser: (name) => null,
       getInteger: (name) => parseInt(args[0]) || null,
       getBoolean: (name) => args[0] === 'true',
@@ -97,65 +97,135 @@ export function mapArgumentsToOptions(args, commandData) {
     };
   }
 
-  const subcommandGroup = cmdData.options.find((opt) => opt.type === 2);
-  const subcommands = cmdData.options.filter((opt) => opt.type === 1);
-  const hasSubcommands = subcommands.length > 0 && !subcommandGroup;
+  const subcommandGroup = cmdData.options.find(
+    (opt) => opt.type === 2
+  );
+
+  const subcommands = cmdData.options.filter(
+    (opt) => opt.type === 1
+  );
+
+  const hasSubcommands =
+    subcommands.length > 0 && !subcommandGroup;
 
   let currentArgs = args;
   let optionDefs = [];
 
-  logger.debug(
-    `Parsing prefix command: commandName=${cmdData.name}, args=${JSON.stringify(args)}, hasSubcommands=${hasSubcommands}, hasSubcommandGroup=${!!subcommandGroup}, optionsCount=${cmdData.options.length}`,
-  );
-
+  /*
+   * SUBCOMMAND GROUP
+   */
   if (subcommandGroup) {
     if (args.length > 0) {
       subcommandGroupName = args[0].toLowerCase();
-      const group = subcommandGroup.options?.find((g) => g.name === subcommandGroupName);
+
+      const group = subcommandGroup.options?.find(
+        (g) => g.name === subcommandGroupName
+      );
+
       if (group && args.length > 1) {
         subcommandName = resolveSubcommandAlias(args[1]);
-        const sub = group.options?.find((s) => s.name === subcommandName);
+
+        const sub = group.options?.find(
+          (s) => s.name === subcommandName
+        );
+
         if (sub) {
-          optionDefs = sub.options?.filter((opt) => opt.type !== 1 && opt.type !== 2) || [];
+          optionDefs =
+            sub.options?.filter(
+              (opt) => opt.type !== 1 && opt.type !== 2
+            ) || [];
+
           currentArgs = args.slice(2);
-        } else {
-          logger.debug(`Subcommand ${subcommandName} not found in group ${subcommandGroupName}`);
         }
-      } else if (!group) {
-        logger.debug(`Subcommand group ${subcommandGroupName} not found`);
       }
     }
-  } else if (hasSubcommands) {
+  }
+
+  /*
+   * NORMAL SUBCOMMAND
+   */
+  else if (hasSubcommands) {
     if (args.length > 0) {
-      const resolvedSubcommand = resolveSubcommandAlias(args[0]);
-      logger.debug(
-        `Looking for subcommand: ${resolvedSubcommand}, available: ${subcommands.map((s) => s.name).join(', ')}`,
+      const resolvedSubcommand =
+        resolveSubcommandAlias(args[0]);
+
+      const sub = subcommands.find(
+        (s) => s.name === resolvedSubcommand
       );
-      const sub = subcommands.find((s) => s.name === resolvedSubcommand);
+
       if (sub) {
         subcommandName = resolvedSubcommand;
-        optionDefs = sub.options?.filter((opt) => opt.type !== 1 && opt.type !== 2) || [];
+
+        optionDefs =
+          sub.options?.filter(
+            (opt) => opt.type !== 1 && opt.type !== 2
+          ) || [];
+
         currentArgs = args.slice(1);
-        logger.debug(`Found subcommand ${subcommandName}, optionDefs: ${optionDefs.length}`);
-      } else {
-        logger.debug(`Subcommand ${resolvedSubcommand} not found`);
       }
     }
-  } else {
-    optionDefs = cmdData.options.filter((opt) => opt.type !== 1 && opt.type !== 2);
   }
 
-  for (let i = 0; i < Math.min(currentArgs.length, optionDefs.length); i++) {
+  /*
+   * NORMAL COMMAND
+   */
+  else {
+    optionDefs = cmdData.options.filter(
+      (opt) => opt.type !== 1 && opt.type !== 2
+    );
+  }
+
+  /*
+   * MAP ARGUMENTS
+   */
+  for (
+    let i = 0;
+    i < optionDefs.length;
+    i++
+  ) {
     const optionDef = optionDefs[i];
-    const value = currentArgs[i];
-    
-    options[optionDef.name] = value;
+
+    if (!currentArgs[i]) {
+      continue;
+    }
+
+    /*
+     * IMPORTANT:
+     * If this is the last string option,
+     * join ALL remaining words.
+     *
+     * Example:
+     * play love nwantiti
+     *
+     * becomes:
+     * query = "love nwantiti"
+     */
+    if (
+      optionDef.type === 3 &&
+      i === optionDefs.length - 1
+    ) {
+      options[optionDef.name] =
+        currentArgs.slice(i).join(' ');
+    } else {
+      options[optionDef.name] =
+        currentArgs[i];
+    }
   }
 
+  /*
+   * REQUIRED OPTIONS
+   */
   const missing = [];
-  if (subcommandName || (!hasSubcommands && !subcommandGroup)) {
+
+  if (
+    subcommandName ||
+    (!hasSubcommands && !subcommandGroup)
+  ) {
     for (const opt of optionDefs) {
-      if (opt.required && !options[opt.name]) {
+      if (
+        opt.required &&
+        !options[opt.name]
+      ) {
         missing.push({
           name: opt.name,
           description: opt.description,
@@ -165,44 +235,112 @@ export function mapArgumentsToOptions(args, commandData) {
     }
   }
 
-  if ((hasSubcommands || subcommandGroup) && !subcommandName && !subcommandGroupName) {
-    const availableSubcommands = hasSubcommands
-      ? subcommands.map((s) => s.name).join(',') || 'none'
-      : subcommandGroup?.options?.map((g) => g.name).join(',') || 'none';
+  /*
+   * MISSING SUBCOMMAND
+   */
+  if (
+    (hasSubcommands || subcommandGroup) &&
+    !subcommandName &&
+    !subcommandGroupName
+  ) {
+    const availableSubcommands =
+      hasSubcommands
+        ? subcommands.map((s) => s.name).join(', ') || 'none'
+        : subcommandGroup?.options
+            ?.map((g) => g.name)
+            .join(', ') || 'none';
+
     missing.push({
-      name: subcommandGroup ? 'subcommand group' : 'subcommand',
-      description: `Available: ${availableSubcommands}`,
+      name: subcommandGroup
+        ? 'subcommand group'
+        : 'subcommand',
+      description:
+        `Available: ${availableSubcommands}`,
       type: 1,
     });
-  } else if (hasSubcommands && args.length > 0 && !subcommandName) {
+  }
+
+  /*
+   * INVALID SUBCOMMAND
+   */
+  else if (
+    hasSubcommands &&
+    args.length > 0 &&
+    !subcommandName
+  ) {
     missing.push({
       name: 'subcommand',
-      description: `Available: ${subcommands.map((s) => s.name).join(', ')}`,
+      description:
+        `Available: ${subcommands
+          .map((s) => s.name)
+          .join(', ')}`,
       type: 1,
     });
-  } else if (subcommandGroup && subcommandGroupName && !subcommandName) {
-    const group = subcommandGroup.options?.find((g) => g.name === subcommandGroupName);
-    const availableSubcommands = group?.options?.map((s) => s.name).join(',') || 'none';
+  }
+
+  /*
+   * INVALID GROUP SUBCOMMAND
+   */
+  else if (
+    subcommandGroup &&
+    subcommandGroupName &&
+    !subcommandName
+  ) {
+    const group =
+      subcommandGroup.options?.find(
+        (g) => g.name === subcommandGroupName
+      );
+
+    const availableSubcommands =
+      group?.options
+        ?.map((s) => s.name)
+        .join(', ') || 'none';
+
     missing.push({
       name: 'subcommand',
-      description: `Available: ${availableSubcommands}`,
+      description:
+        `Available: ${availableSubcommands}`,
       type: 1,
     });
   }
 
   return {
     ...options,
+
     _positional: args,
-    get: (name) => options[name] || null,
-    getString: (name) => options[name] || null,
-    getUser: (name) => options[name] || null,
-    getMember: (name) => options[name] || null,
-    getChannel: (name) => options[name] || null,
-    getRole: (name) => options[name] || null,
-    getInteger: (name) => options[name] ? parseInt(options[name]) : null,
-    getBoolean: (name) => options[name] === 'true',
-    getSubcommand: () => subcommandName,
-    getSubcommandGroup: () => subcommandGroupName,
+
+    get: (name) =>
+      options[name] || null,
+
+    getString: (name) =>
+      options[name] || null,
+
+    getUser: (name) =>
+      options[name] || null,
+
+    getMember: (name) =>
+      options[name] || null,
+
+    getChannel: (name) =>
+      options[name] || null,
+
+    getRole: (name) =>
+      options[name] || null,
+
+    getInteger: (name) =>
+      options[name]
+        ? parseInt(options[name])
+        : null,
+
+    getBoolean: (name) =>
+      options[name] === 'true',
+
+    getSubcommand: () =>
+      subcommandName,
+
+    getSubcommandGroup: () =>
+      subcommandGroupName,
+
     validateRequired: () => ({
       valid: missing.length === 0,
       missing,
