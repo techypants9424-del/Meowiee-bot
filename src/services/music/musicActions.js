@@ -206,10 +206,10 @@ export async function playQuery(client, interaction, query) {
 
     const { player, guildData } = await ensurePlayer(client, interaction);
 
-    const result = await client.riffy.resolve({
-        query,
-        requester: interaction.user,
-    });
+   const result = await client.riffy.resolve({
+    query: `ytsearch:${query}`,
+    requester: interaction.user,
+}); 
 
     const { loadType, tracks, playlistInfo } = result;
 
