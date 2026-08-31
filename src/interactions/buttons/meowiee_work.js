@@ -1,305 +1,210 @@
 import {
+    getEconomyData,
+    saveEconomyData,
+} from '../../utils/economy.js';
+
+import { createEmbed } from '../../utils/embeds.js';
+
+import {
+    moveMeowiee,
+    createMeowieeMap,
+    getShopAtPosition,
+    getMeowieeGameTimeLeft,
+    formatGameTime,
+    WRONG_SHOP_PENALTY,
+    ESCAPE_PENALTY,
+} from '../../utils/meowieeWorkGame.js';
+
+import {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
 } from 'discord.js';
 
-import { createEmbed } from '../../utils/embeds.js';
-import {
-    getEconomyData,
-    saveEconomyData,
-} from '../../utils/economy.js';
-
-const WRONG_SHOP_PENALTY = 30;
-const ESCAPE_PENALTY = 25;
-const GAME_TIME = 5 * 60 * 1000;
-
-// Shop positions on the Discord map
-const SHOPS = {
-    food: {
-        x: 4,
-        y: 2,
-        name: 'Food Shop',
-        emoji: '🍔',
-    },
-
-    cafe: {
-        x: 3,
-        y: 3,
-        name: 'Café',
-        emoji: '☕',
-    },
-
-    toy: {
-        x: 0,
-        y: 2,
-        name: 'Toy Shop',
-        emoji: '🧸',
-    },
-
-    game: {
-        x: 3,
-        y: 1,
-        name: 'Game Shop',
-        emoji: '🎮',
-    },
-
-    book: {
-        x: 1,
-        y: 3,
-        name: 'Book Shop',
-        emoji: '📚',
-    },
-
-    mall: {
-        x: 2,
-        y: 4,
-        name: 'Mall',
-        emoji: '🛍️',
-    },
-
-    clinic: {
-        x: 1,
-        y: 1,
-        name: 'Clinic',
-        emoji: '🏥',
-    },
-};
-
-const START_POSITION = {
-    x: 2,
-    y: 2,
-};
-
-
-/* ==========================================
-   MOVEMENT BUTTONS
-========================================== */
+// ==========================================
+// MOVEMENT BUTTONS
+// ==========================================
 
 function createMovementButtons() {
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setCustomId('meowiee_move_up')
+                .setCustomId(
+                    'meowiee_move_up'
+                )
                 .setLabel('⬆️')
-                .setStyle(ButtonStyle.Primary)
+                .setStyle(
+                    ButtonStyle.Primary
+                )
         ),
 
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setCustomId('meowiee_move_left')
+                .setCustomId(
+                    'meowiee_move_left'
+                )
                 .setLabel('⬅️')
-                .setStyle(ButtonStyle.Primary),
+                .setStyle(
+                    ButtonStyle.Primary
+                ),
 
             new ButtonBuilder()
-                .setCustomId('meowiee_move_down')
+                .setCustomId(
+                    'meowiee_move_down'
+                )
                 .setLabel('⬇️')
-                .setStyle(ButtonStyle.Primary),
+                .setStyle(
+                    ButtonStyle.Primary
+                ),
 
             new ButtonBuilder()
-                .setCustomId('meowiee_move_right')
+                .setCustomId(
+                    'meowiee_move_right'
+                )
                 .setLabel('➡️')
-                .setStyle(ButtonStyle.Primary)
+                .setStyle(
+                    ButtonStyle.Primary
+                )
         ),
     ];
 }
 
+// ==========================================
+// COIN BALANCE HELPER
+// ==========================================
 
-/* ==========================================
-   MOVE MEOWIEE
-========================================== */
+function changeMeowCoins(
+    data,
+    amount
+) {
+    /*
+     * Your economy data may use one of these
+     * common balance property names.
+     *
+     * We use the one that already exists.
+     */
 
-function moveMeowiee(position, direction) {
-    const newPosition = {
-        x: position?.x ?? START_POSITION.x,
-        y: position?.y ?? START_POSITION.y,
-    };
+    const possibleKeys = [
+        'balance',
+        'coins',
+        'meowCoins',
+        'wallet',
+    ];
 
-    switch (direction) {
-        case 'up':
-            newPosition.y--;
-            break;
+    let balanceKey =
+        possibleKeys.find(
+            key =>
+                typeof data[key] ===
+                'number'
+        );
 
-        case 'down':
-            newPosition.y++;
-            break;
-
-        case 'left':
-            newPosition.x--;
-            break;
-
-        case 'right':
-            newPosition.x++;
-            break;
+    // If the user has no existing balance
+    // property, use balance.
+    if (!balanceKey) {
+        balanceKey = 'balance';
+        data[balanceKey] = 0;
     }
 
-    // Keep Meowiee inside the map
-    newPosition.x = Math.max(
+    data[balanceKey] = Math.max(
         0,
-        Math.min(4, newPosition.x)
+        Number(data[balanceKey]) +
+        Number(amount)
     );
 
-    newPosition.y = Math.max(
-        1,
-        Math.min(4, newPosition.y)
-    );
-
-    return newPosition;
+    return data[balanceKey];
 }
 
-
-/* ==========================================
-   FIND SHOP AT POSITION
-========================================== */
-
-function getShopAtPosition(position) {
-    for (const [id, shop] of Object.entries(SHOPS)) {
-        if (
-            shop.x === position.x &&
-            shop.y === position.y
-        ) {
-            return {
-                id,
-                ...shop,
-            };
-        }
-    }
-
-    return null;
-}
-
-
-/* ==========================================
-   CREATE MAP
-========================================== */
-
-function createMap(position) {
-    const map = [];
-
-    for (let y = 1; y <= 4; y++) {
-        let row = '';
-
-        for (let x = 0; x <= 4; x++) {
-            if (
-                position.x === x &&
-                position.y === y
-            ) {
-                row += '🐱 ';
-                continue;
-            }
-
-            const shop = Object.values(SHOPS).find(
-                item =>
-                    item.x === x &&
-                    item.y === y
-            );
-
-            if (shop) {
-                row += `${shop.emoji} `;
-            } else {
-                row += '⬜ ';
-            }
-        }
-
-        map.push(row);
-    }
-
-    return map.join('\n');
-}
-
-
-/* ==========================================
-   TIME LEFT
-========================================== */
-
-function getTimeLeft(game) {
-    const expiresAt =
-        game.expiresAt ||
-        ((game.startedAt || Date.now()) + GAME_TIME);
-
-    return Math.max(
-        0,
-        expiresAt - Date.now()
-    );
-}
-
-
-function formatTime(milliseconds) {
-    const totalSeconds =
-        Math.floor(milliseconds / 1000);
-
-    const minutes =
-        Math.floor(totalSeconds / 60);
-
-    const seconds =
-        totalSeconds % 60;
-
-    return `${minutes}:${String(seconds).padStart(2, '0')}`;
-}
-
-
-/* ==========================================
-   HANDLER
-========================================== */
+// ==========================================
+// HANDLER
+// ==========================================
 
 export default {
     name: 'meowiee_work',
 
-    async execute(interaction, client) {
+    async execute(
+        interaction,
+        client
+    ) {
 
         if (!interaction.isButton()) {
             return;
         }
 
-        if (!interaction.customId.startsWith('meowiee_move_')) {
+        if (
+            !interaction.customId.startsWith(
+                'meowiee_move_'
+            )
+        ) {
             return;
         }
 
         const ready =
-            await interaction.deferUpdate().catch(() => false);
+            await interaction.deferUpdate()
+                .catch(() => false);
 
         if (ready === false) {
             return;
         }
 
         try {
-            const guildId = interaction.guildId;
-            const userId = interaction.user.id;
+
+            const guildId =
+                interaction.guildId;
+
+            const userId =
+                interaction.user.id;
 
             if (!guildId) {
                 return;
             }
 
-            const data = await getEconomyData(
-                client,
-                guildId,
-                userId
-            );
+            const data =
+                await getEconomyData(
+                    client,
+                    guildId,
+                    userId
+                );
 
-            const game = data.workTask;
+            const game =
+                data.workTask;
 
-            // No active game
+            // ==================================
+            // NO GAME
+            // ==================================
+
             if (
                 !game ||
-                game.type !== 'meowiee_game'
+                game.type !==
+                    'meowiee_game'
             ) {
+
                 await interaction.editReply({
                     content:
                         '❌ You do not have an active Meowiee game.',
+
                     embeds: [],
+
                     components: [],
                 });
 
                 return;
             }
 
-            // ======================================
-            // CHECK TIMER
-            // ======================================
+            // ==================================
+            // TIMER
+            // ==================================
 
-            const timeLeft = getTimeLeft(game);
+            const timeLeft =
+                getMeowieeGameTimeLeft(
+                    game
+                );
 
             if (timeLeft <= 0) {
+
+                changeMeowCoins(
+                    data,
+                    -ESCAPE_PENALTY
+                );
 
                 data.workTask = null;
 
@@ -310,13 +215,19 @@ export default {
                     data
                 );
 
-                const embed = createEmbed({
-                    title: '💨 MEOWIEE RAN AWAY!',
-                    description:
-                        `You took too long! 😭\n\n` +
-                        `Meowiee got bored, ran away and stole ` +
-                        `**${ESCAPE_PENALTY} MeowCoins**! 💸`,
-                });
+                const embed =
+                    createEmbed({
+                        title:
+                            '💨 MEOWIEE RAN AWAY!',
+
+                        description:
+                            `You took too long! 😭\n\n` +
+
+                            `Meowiee got bored, escaped and stole ` +
+                            `**${ESCAPE_PENALTY} MeowCoins**! 💸\n\n` +
+
+                            `🐱💨 *"BYE HUMAN!"*`,
+                    });
 
                 await interaction.editReply({
                     embeds: [embed],
@@ -326,9 +237,9 @@ export default {
                 return;
             }
 
-            // ======================================
-            // MOVE
-            // ======================================
+            // ==================================
+            // DIRECTION
+            // ==================================
 
             const direction =
                 interaction.customId.replace(
@@ -336,10 +247,19 @@ export default {
                     ''
                 );
 
+            // ==================================
+            // CURRENT POSITION
+            // ==================================
+
             const currentPosition =
                 game.position || {
-                    ...START_POSITION,
+                    x: 2,
+                    y: 2,
                 };
+
+            // ==================================
+            // MOVE
+            // ==================================
 
             const newPosition =
                 moveMeowiee(
@@ -347,33 +267,36 @@ export default {
                     direction
                 );
 
-            game.position = newPosition;
+            game.position =
+                newPosition;
 
-            // ======================================
-            // CHECK SHOP
-            // ======================================
+            // ==================================
+            // SHOP CHECK
+            // ==================================
 
             const shop =
-                getShopAtPosition(newPosition);
+                getShopAtPosition(
+                    newPosition
+                );
 
             if (shop) {
 
                 const destination =
                     game.destination;
 
-                const destinationId =
-                    destination?.id ||
-                    destination?.type ||
-                    destination?.key;
-
                 // ==================================
                 // WRONG SHOP
                 // ==================================
 
                 if (
-                    destinationId !== shop.id &&
-                    destination?.name !== shop.name
+                    shop.id !==
+                    destination.id
                 ) {
+
+                    changeMeowCoins(
+                        data,
+                        -WRONG_SHOP_PENALTY
+                    );
 
                     data.workTask = null;
 
@@ -384,22 +307,24 @@ export default {
                         data
                     );
 
-                    const embed = createEmbed({
-                        title:
-                            '😾 MEOWIEE WENT OUT OF CONTROL!',
-                        description:
-                            `You took Meowiee to the wrong shop!\n\n` +
+                    const embed =
+                        createEmbed({
+                            title:
+                                '😾 MEOWIEE WENT OUT OF CONTROL!',
 
-                            `❌ You went to ` +
-                            `${shop.emoji} **${shop.name}**\n` +
+                            description:
+                                `You took Meowiee to the wrong shop!\n\n` +
 
-                            `📍 She needed to go to ` +
-                            `${destination.emoji} **${destination.name}**\n\n` +
+                                `❌ **You went to:** ` +
+                                `${shop.emoji} **${shop.name}**\n\n` +
 
-                            `💸 Meowiee stole ` +
-                            `**${WRONG_SHOP_PENALTY} MeowCoins** ` +
-                            `and ran away! 🐱💨`,
-                    });
+                                `🎯 **She needed:** ` +
+                                `${destination.emoji} **${destination.name}**\n\n` +
+
+                                `💸 Meowiee stole ` +
+                                `**${WRONG_SHOP_PENALTY} MeowCoins** ` +
+                                `and ran away! 🐱💨`,
+                        });
 
                     await interaction.editReply({
                         embeds: [embed],
@@ -414,7 +339,13 @@ export default {
                 // ==================================
 
                 const reward =
-                    Number(game.reward) || 50;
+                    Number(game.reward) ||
+                    50;
+
+                changeMeowCoins(
+                    data,
+                    reward
+                );
 
                 data.workTask = null;
 
@@ -425,19 +356,23 @@ export default {
                     data
                 );
 
-                const embed = createEmbed({
-                    title: '🎉 JOB COMPLETE!',
-                    description:
-                        `You successfully delivered Meowiee! 🐱\n\n` +
+                const embed =
+                    createEmbed({
+                        title:
+                            '🎉 JOB COMPLETE!',
 
-                        `📍 **Destination:** ` +
-                        `${destination.emoji} **${destination.name}**\n\n` +
+                        description:
+                            `You successfully delivered Meowiee! 🐱🎉\n\n` +
 
-                        `🪙 **Reward:** ` +
-                        `**+${reward.toLocaleString()} MeowCoins**\n\n` +
+                            `📍 **Destination:** ` +
+                            `${destination.emoji} **${destination.name}**\n\n` +
 
-                        `🐾 Meowiee is happy!`,
-                });
+                            `🪙 **Reward:** ` +
+                            `**+${reward.toLocaleString()} MeowCoins**\n\n` +
+
+                            `🐾 Meowiee is happy!\n` +
+                            `😺 *"Mew~ thank you!"*`,
+                    });
 
                 await interaction.editReply({
                     embeds: [embed],
@@ -447,9 +382,9 @@ export default {
                 return;
             }
 
-            // ======================================
+            // ==================================
             // SAVE POSITION
-            // ======================================
+            // ==================================
 
             await saveEconomyData(
                 client,
@@ -458,37 +393,48 @@ export default {
                 data
             );
 
-            // ======================================
-            // UPDATE GAME
-            // ======================================
+            // ==================================
+            // UPDATE MAP
+            // ==================================
 
-            const embed = createEmbed({
-                title: '🐱 Meowiee Work!',
-                description:
-                    `📍 **Take Meowiee to:** ` +
-                    `${game.destination.emoji} ` +
-                    `**${game.destination.name}**\n\n` +
+            const map =
+                createMeowieeMap(
+                    newPosition
+                );
 
-                    `⏱️ **Time Left:** ` +
-                    `**${formatTime(timeLeft)}**\n\n` +
+            const embed =
+                createEmbed({
+                    title:
+                        '🐱 Meowiee Work!',
 
-                    `🗺️ **Map:**\n` +
-                    '```' +
-                    `\n${createMap(newPosition)}\n` +
-                    '```\n' +
+                    description:
+                        `🎯 **Take Meowiee to:** ` +
+                        `${game.destination.emoji} ` +
+                        `**${game.destination.name}**\n\n` +
 
-                    `🐾 Use the buttons to guide Meowiee!`,
-            }).setFooter({
-                text:
-                    'Wrong shop = -30 MeowCoins • Timeout = -25 MeowCoins',
-            });
+                        `⏱️ **Time Left:** ` +
+                        `**${formatGameTime(timeLeft)}**\n\n` +
+
+                        `🗺️ **Meowiee City:**\n` +
+                        '```' +
+                        `\n${map}\n` +
+                        '```\n' +
+
+                        `🐾 Guide Meowiee to the correct shop!`,
+                }).setFooter({
+                    text:
+                        '⚠️ Wrong shop = -30 • 💨 Timeout = -25',
+                });
 
             await interaction.editReply({
                 embeds: [embed],
-                components: createMovementButtons(),
+
+                components:
+                    createMovementButtons(),
             });
 
         } catch (error) {
+
             console.error(
                 '[MEOWIEE_WORK] ERROR:',
                 error
@@ -497,7 +443,9 @@ export default {
             await interaction.editReply({
                 content:
                     '❌ Something went wrong with the Meowiee game.',
+
                 embeds: [],
+
                 components: [],
             }).catch(() => {});
         }
