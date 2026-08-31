@@ -1,11 +1,7 @@
-import {
-    SlashCommandBuilder,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-} from 'discord.js';
+import { SlashCommandBuilder } from 'discord.js';
 
 import { createEmbed } from '../../utils/embeds.js';
+
 import {
     getEconomyData,
     saveEconomyData,
@@ -27,9 +23,6 @@ const WORK_COOLDOWN = 60 * 60 * 1000; // 1 hour
 const TASK_AMOUNT = 10;
 const REWARD_MIN = 20;
 const REWARD_MAX = 80;
-
-// Mini-game
-const GAME_URL = 'https://YOUR-GAME-DOMAIN.com/meowiee-game';
 
 export default {
     data: new SlashCommandBuilder()
@@ -89,6 +82,7 @@ export default {
                 interaction,
                 {
                     embeds: [embed],
+                    components: [],
                 }
             );
 
@@ -109,8 +103,6 @@ export default {
             const game = createMeowieeGame(now);
 
             data.workTask = game;
-
-            // Start the 1-hour work cooldown
             data.lastWork = now;
 
             await saveEconomyData(
@@ -127,37 +119,28 @@ export default {
                 description:
                     `Meowiee needs your help!\n\n` +
 
-                    `📍 **Destination:** ` +
+                    `📍 **Take Meowiee to:** ` +
                     `${destination.emoji} **${destination.name}**\n\n` +
 
                     `💰 **Reward:** ` +
                     `**${game.reward.toLocaleString()} MeowCoins**\n\n` +
 
-                    `⏰ **Time Limit:** ` +
-                    `**5 minutes**\n\n` +
+                    `⏰ **Time Limit:** **5 minutes**\n\n` +
 
-                    `🐾 Guide Meowiee to the correct shop before she gets out of control!\n\n` +
+                    `🐾 Use the movement buttons below to guide Meowiee!\n\n` +
 
-                    `⚠️ Take her to the wrong shop and she will steal **30 MeowCoins**!\n` +
+                    `⚠️ Wrong shop → Meowiee steals **30 MeowCoins**!\n` +
 
-                    `💨 Let the timer run out and Meowiee will run away with **25 MeowCoins**!`,
+                    `💨 Time runs out → Meowiee runs away with **25 MeowCoins**!`,
             }).setFooter({
-                text: 'Good luck! Keep Meowiee under control! 🐾',
+                text: 'Keep Meowiee under control! 🐾',
             });
-
-            // Button to launch the actual game
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setLabel('🐱 Start Meowiee Game')
-                    .setStyle(ButtonStyle.Link)
-                    .setURL(GAME_URL)
-            );
 
             await InteractionHelper.safeEditReply(
                 interaction,
                 {
                     embeds: [embed],
-                    components: [row],
+                    components: createMovementButtons(),
                 }
             );
 
@@ -213,7 +196,52 @@ export default {
             interaction,
             {
                 embeds: [embed],
+                components: [],
             }
         );
     }, { command: 'work' }),
 };
+
+
+// ==========================================
+// 🐾 MEOWIEE MOVEMENT BUTTONS
+// ==========================================
+
+function createMovementButtons() {
+    return [
+        {
+            type: 1,
+            components: [
+                {
+                    type: 2,
+                    custom_id: 'meowiee_move_up',
+                    label: '⬆️',
+                    style: 1,
+                },
+            ],
+        },
+        {
+            type: 1,
+            components: [
+                {
+                    type: 2,
+                    custom_id: 'meowiee_move_left',
+                    label: '⬅️',
+                    style: 1,
+                },
+                {
+                    type: 2,
+                    custom_id: 'meowiee_move_down',
+                    label: '⬇️',
+                    style: 1,
+                },
+                {
+                    type: 2,
+                    custom_id: 'meowiee_move_right',
+                    label: '➡️',
+                    style: 1,
+                },
+            ],
+        },
+    ];
+}
