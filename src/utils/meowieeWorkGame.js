@@ -3,87 +3,117 @@
 /**
  * Meowiee Work Mini-Game
  *
- * Work has a 50/50 chance:
+ * 50/50 chance from /work:
  *  - Normal work: send 10 messages
- *  - Meowiee mini-game: take Meowiee to the correct shop
+ *  - Meowiee game: guide Meowiee to a randomly selected shop
  */
 
 const MINIGAME_TIME = 5 * 60 * 1000; // 5 minutes
 
-// Successful mini-game reward
 const REWARD_MIN = 50;
 const REWARD_MAX = 60;
 
-// Penalties
 const WRONG_SHOP_PENALTY = 30;
 const ESCAPE_PENALTY = 25;
 
-// Meowiee starting position
+// ==========================================
+// MAP
+// ==========================================
+
+const MAP_WIDTH = 5;
+const MAP_HEIGHT = 4;
+
 const START_POSITION = {
     x: 2,
     y: 2,
 };
 
-// Available destinations
+// ==========================================
+// SHOPS
+// ==========================================
+
 const SHOPS = [
     {
         id: 'food',
         name: 'Food Shop',
         emoji: '🍔',
+        x: 4,
+        y: 2,
     },
+
     {
         id: 'cafe',
         name: 'Café',
         emoji: '☕',
+        x: 3,
+        y: 3,
     },
+
     {
         id: 'toy',
         name: 'Toy Shop',
         emoji: '🧸',
+        x: 0,
+        y: 2,
     },
+
     {
         id: 'game',
         name: 'Game Shop',
         emoji: '🎮',
+        x: 3,
+        y: 1,
     },
+
     {
         id: 'book',
         name: 'Book Shop',
         emoji: '📚',
+        x: 1,
+        y: 3,
     },
+
     {
         id: 'mall',
         name: 'Mall',
         emoji: '🛍️',
+        x: 2,
+        y: 4,
     },
+
     {
         id: 'clinic',
         name: 'Clinic',
         emoji: '🏥',
+        x: 1,
+        y: 1,
     },
 ];
 
-/**
- * Random number helper
- */
+// ==========================================
+// RANDOM NUMBER
+// ==========================================
+
 function randomNumber(min, max) {
     return Math.floor(
         Math.random() * (max - min + 1)
     ) + min;
 }
 
-/**
- * Pick a random shop.
- */
+// ==========================================
+// RANDOM SHOP
+// ==========================================
+
 export function getRandomShop() {
     return SHOPS[
         Math.floor(Math.random() * SHOPS.length)
     ];
 }
 
-/**
- * Generate a new Meowiee mini-game.
- */
+// ==========================================
+// CREATE GAME
+// ==========================================
+
 export function createMeowieeGame(now = Date.now()) {
     const destination = getRandomShop();
 
@@ -96,33 +126,145 @@ export function createMeowieeGame(now = Date.now()) {
             emoji: destination.emoji,
         },
 
-        // Random reward between 50 and 60
         reward: randomNumber(
             REWARD_MIN,
             REWARD_MAX
         ),
 
-        // Game timing
         startedAt: now,
-        expiresAt: now + MINIGAME_TIME,
 
-        // Current Meowiee position
+        expiresAt:
+            now + MINIGAME_TIME,
+
         position: {
             ...START_POSITION,
         },
 
-        // Game state
         status: 'active',
 
-        // Penalties
-        wrongShopPenalty: WRONG_SHOP_PENALTY,
-        escapePenalty: ESCAPE_PENALTY,
+        wrongShopPenalty:
+            WRONG_SHOP_PENALTY,
+
+        escapePenalty:
+            ESCAPE_PENALTY,
     };
 }
 
-/**
- * Check whether the mini-game has expired.
- */
+// ==========================================
+// MOVE MEOWIEE
+// ==========================================
+
+export function moveMeowiee(
+    position,
+    direction
+) {
+    const newPosition = {
+        x: position?.x ?? START_POSITION.x,
+        y: position?.y ?? START_POSITION.y,
+    };
+
+    switch (direction) {
+        case 'up':
+            newPosition.y--;
+            break;
+
+        case 'down':
+            newPosition.y++;
+            break;
+
+        case 'left':
+            newPosition.x--;
+            break;
+
+        case 'right':
+            newPosition.x++;
+            break;
+    }
+
+    // Keep Meowiee inside map
+    newPosition.x = Math.max(
+        0,
+        Math.min(
+            MAP_WIDTH - 1,
+            newPosition.x
+        )
+    );
+
+    newPosition.y = Math.max(
+        1,
+        Math.min(
+            MAP_HEIGHT,
+            newPosition.y
+        )
+    );
+
+    return newPosition;
+}
+
+// ==========================================
+// FIND SHOP
+// ==========================================
+
+export function getShopAtPosition(position) {
+    return SHOPS.find(
+        shop =>
+            shop.x === position.x &&
+            shop.y === position.y
+    ) || null;
+}
+
+// ==========================================
+// CREATE MAP
+// ==========================================
+
+export function createMeowieeMap(position) {
+    const rows = [];
+
+    for (
+        let y = 1;
+        y <= MAP_HEIGHT;
+        y++
+    ) {
+        let row = '';
+
+        for (
+            let x = 0;
+            x < MAP_WIDTH;
+            x++
+        ) {
+            // Meowiee
+            if (
+                position.x === x &&
+                position.y === y
+            ) {
+                row += '🐱 ';
+                continue;
+            }
+
+            // Shop
+            const shop = SHOPS.find(
+                item =>
+                    item.x === x &&
+                    item.y === y
+            );
+
+            if (shop) {
+                row += `${shop.emoji} `;
+            } else {
+                row += '⬜ ';
+            }
+        }
+
+        rows.push(row);
+    }
+
+    return rows.join('\n');
+}
+
+// ==========================================
+// TIMER
+// ==========================================
+
 export function isMeowieeGameExpired(
     game,
     now = Date.now()
@@ -137,9 +279,6 @@ export function isMeowieeGameExpired(
     return now >= game.expiresAt;
 }
 
-/**
- * Get remaining time in milliseconds.
- */
 export function getMeowieeGameTimeLeft(
     game,
     now = Date.now()
@@ -157,10 +296,10 @@ export function getMeowieeGameTimeLeft(
     );
 }
 
-/**
- * Check whether the player reached
- * the correct shop.
- */
+// ==========================================
+// CORRECT DESTINATION
+// ==========================================
+
 export function isCorrectDestination(
     game,
     shopId
@@ -175,9 +314,10 @@ export function isCorrectDestination(
     return game.destination.id === shopId;
 }
 
-/**
- * Format remaining game time.
- */
+// ==========================================
+// FORMAT TIME
+// ==========================================
+
 export function formatGameTime(
     milliseconds
 ) {
@@ -187,7 +327,9 @@ export function formatGameTime(
     );
 
     const minutes =
-        Math.floor(totalSeconds / 60);
+        Math.floor(
+            totalSeconds / 60
+        );
 
     const seconds =
         totalSeconds % 60;
@@ -197,22 +339,18 @@ export function formatGameTime(
     ).padStart(2, '0')}`;
 }
 
-/**
- * Get all available shops.
- */
-export function getAvailableShops() {
-    return [...SHOPS];
-}
+// ==========================================
+// EXPORTS
+// ==========================================
 
-/**
- * Constants
- */
 export {
     SHOPS,
+    START_POSITION,
+    MAP_WIDTH,
+    MAP_HEIGHT,
     MINIGAME_TIME,
     REWARD_MIN,
     REWARD_MAX,
     WRONG_SHOP_PENALTY,
     ESCAPE_PENALTY,
-    START_POSITION,
 };
