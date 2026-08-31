@@ -32,6 +32,7 @@ export default {
       if (message.author.bot || !message.guild) return;
 
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
+      await handlePingReaction(message);
 
    const countingProcessed = await handleCountingGame(message, client);
 if (countingProcessed) {
@@ -55,6 +56,7 @@ await handleLeveling(message, client);
     }
   }
 };
+
 
 async function handleMeowieeReactions(message) {
   try {
@@ -417,7 +419,20 @@ async function handlePrefixCommand(message, client) {
     logger.error('Error handling prefixless command:', error);
   }
 }
+async function handlePingReaction(message) {
+  try {
+    const TARGET_USER_ID = '1497237196728696903';
+    const REACTION_EMOJI = '<a:138746bluewings:1543222719703949413>';
 
+    if (!message.mentions.users.has(TARGET_USER_ID)) {
+      return;
+    }
+
+    await message.react(REACTION_EMOJI);
+  } catch (error) {
+    logger.error('Failed to react to ping:', error);
+  }
+}
 async function handleCountingGame(message, client) {
   try {
     const config = await getCountingGameConfig(client, message.guild.id);
