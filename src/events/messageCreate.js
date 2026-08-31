@@ -422,7 +422,7 @@ async function handlePrefixCommand(message, client) {
 async function handlePingReaction(message) {
   try {
     const TARGET_USER_ID = '1497237196728696903';
-    const REACTION_EMOJI = '<a:emoji_60~1:1514599833397231636>';
+    const REACTION_EMOJI = '<a:owner:1543913663407071302>';
 
     if (!message.mentions.users.has(TARGET_USER_ID)) {
       return;
