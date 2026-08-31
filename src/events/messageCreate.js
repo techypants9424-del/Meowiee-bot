@@ -203,13 +203,13 @@ async function handleWorkTask(message, client) {
      */
 
     const letterCount = (
-      message.content.match(/[a-zA-Z]/g) || []
-    ).length;
+  message.content.match(/[a-zA-Z]/g) || []
+).length;
 
-    // Must contain exactly 4–5 letters
-    if (letterCount < 4 || letterCount > 5) {
-      return;
-    }
+// At least 4 letters
+if (letterCount < 4) {
+  return;
+}
 
     // ==========================================
     // INCREASE PROGRESS
