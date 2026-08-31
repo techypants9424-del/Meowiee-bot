@@ -3,9 +3,6 @@
 /**
  * Meowiee Work Mini-Game
  *
- * This file contains the data and logic for the Meowiee
- * destination mini-game.
- *
  * Work has a 50/50 chance:
  *  - Normal work: send 10 messages
  *  - Meowiee mini-game: take Meowiee to the correct shop
@@ -20,6 +17,12 @@ const REWARD_MAX = 60;
 // Penalties
 const WRONG_SHOP_PENALTY = 30;
 const ESCAPE_PENALTY = 25;
+
+// Meowiee starting position
+const START_POSITION = {
+    x: 2,
+    y: 2,
+};
 
 // Available destinations
 const SHOPS = [
@@ -64,14 +67,18 @@ const SHOPS = [
  * Random number helper
  */
 function randomNumber(min, max) {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
+    return Math.floor(
+        Math.random() * (max - min + 1)
+    ) + min;
 }
 
 /**
  * Pick a random shop.
  */
 export function getRandomShop() {
-    return SHOPS[Math.floor(Math.random() * SHOPS.length)];
+    return SHOPS[
+        Math.floor(Math.random() * SHOPS.length)
+    ];
 }
 
 /**
@@ -83,7 +90,6 @@ export function createMeowieeGame(now = Date.now()) {
     return {
         type: 'meowiee_game',
 
-        // Random destination
         destination: {
             id: destination.id,
             name: destination.name,
@@ -91,14 +97,24 @@ export function createMeowieeGame(now = Date.now()) {
         },
 
         // Random reward between 50 and 60
-        reward: randomNumber(REWARD_MIN, REWARD_MAX),
+        reward: randomNumber(
+            REWARD_MIN,
+            REWARD_MAX
+        ),
 
         // Game timing
         startedAt: now,
         expiresAt: now + MINIGAME_TIME,
 
+        // Current Meowiee position
+        position: {
+            ...START_POSITION,
+        },
+
         // Game state
         status: 'active',
+
+        // Penalties
         wrongShopPenalty: WRONG_SHOP_PENALTY,
         escapePenalty: ESCAPE_PENALTY,
     };
@@ -107,8 +123,14 @@ export function createMeowieeGame(now = Date.now()) {
 /**
  * Check whether the mini-game has expired.
  */
-export function isMeowieeGameExpired(game, now = Date.now()) {
-    if (!game || game.type !== 'meowiee_game') {
+export function isMeowieeGameExpired(
+    game,
+    now = Date.now()
+) {
+    if (
+        !game ||
+        game.type !== 'meowiee_game'
+    ) {
         return true;
     }
 
@@ -118,19 +140,35 @@ export function isMeowieeGameExpired(game, now = Date.now()) {
 /**
  * Get remaining time in milliseconds.
  */
-export function getMeowieeGameTimeLeft(game, now = Date.now()) {
-    if (!game || game.type !== 'meowiee_game') {
+export function getMeowieeGameTimeLeft(
+    game,
+    now = Date.now()
+) {
+    if (
+        !game ||
+        game.type !== 'meowiee_game'
+    ) {
         return 0;
     }
 
-    return Math.max(0, game.expiresAt - now);
+    return Math.max(
+        0,
+        game.expiresAt - now
+    );
 }
 
 /**
- * Check whether the player reached the correct shop.
+ * Check whether the player reached
+ * the correct shop.
  */
-export function isCorrectDestination(game, shopId) {
-    if (!game || game.type !== 'meowiee_game') {
+export function isCorrectDestination(
+    game,
+    shopId
+) {
+    if (
+        !game ||
+        game.type !== 'meowiee_game'
+    ) {
         return false;
     }
 
@@ -138,32 +176,36 @@ export function isCorrectDestination(game, shopId) {
 }
 
 /**
- * Format the remaining game time.
+ * Format remaining game time.
  */
-export function formatGameTime(milliseconds) {
+export function formatGameTime(
+    milliseconds
+) {
     const totalSeconds = Math.max(
         0,
         Math.floor(milliseconds / 1000)
     );
 
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
+    const minutes =
+        Math.floor(totalSeconds / 60);
 
-    return `${minutes}:${String(seconds).padStart(2, '0')}`;
+    const seconds =
+        totalSeconds % 60;
+
+    return `${minutes}:${String(
+        seconds
+    ).padStart(2, '0')}`;
 }
 
 /**
  * Get all available shops.
- *
- * Returns a copy so the original array cannot accidentally
- * be modified by another file.
  */
 export function getAvailableShops() {
     return [...SHOPS];
 }
 
 /**
- * Constants used by work.js and the game handler.
+ * Constants
  */
 export {
     SHOPS,
@@ -172,4 +214,5 @@ export {
     REWARD_MAX,
     WRONG_SHOP_PENALTY,
     ESCAPE_PENALTY,
+    START_POSITION,
 };
