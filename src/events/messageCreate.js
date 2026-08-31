@@ -249,6 +249,9 @@ if (letterCount < 4) {
     // ==========================================
     // SAVE PROGRESS
     // ==========================================
+    
+    // React to the user's message to show it counted
+await message.react('✅').catch(() => {});
 
     await saveEconomyData(
       client,
@@ -257,19 +260,7 @@ if (letterCount < 4) {
       data
     );
 
-    // ==========================================
-    // DISPLAY PROGRESS
-    // ==========================================
-
-    const displayName =
-      message.member?.displayName ||
-      message.author.globalName ||
-      message.author.username;
-
-    await message.channel.send({
-      content:
-        `**${displayName}**\n` +
-        `${message.content} **(${task.progress}/${task.required})**`,
+t} **(${task.progress}/${task.required})**`,
     }).catch(() => {});
 
   } catch (error) {
