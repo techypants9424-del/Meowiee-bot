@@ -204,81 +204,51 @@ export async function playQuery(client, interaction, query) {
         );
     }
 
-    const { player, guildData } = await ensurePlayer(client, interaction);
+    const { player } = await ensurePlayer(client, interaction);
 
-   const result = await client.riffy.resolve({
-    query: `ytsearch:${query}`,
-    requester: interaction.user,
-}); 
+    const result = await client.riffy.resolve({
+        query,
+        requester: interaction.user,
+    });
 
-    const { loadType, tracks, playlistInfo } = result;
+    const track = result?.tracks?.[0];
 
-    if (loadType === 'playlist' || loadType === 'PLAYLIST_LOADED') {
-        let added = 0;
-        let skipped = 0;
-
-        for (const track of tracks) {
-            track.info.requester = interaction.user;
-            if (isDuplicateTrack(player, track)) {
-                skipped += 1;
-                continue;
-            }
-            player.queue.add(track);
-            added += 1;
-        }
-
-        if (!player.playing && !player.paused) {
-            await startPlayback(player);
-        }
-
-        return {
-            embed: successEmbed(
-                'Playlist Added',
-                `**${playlistInfo?.name || 'Playlist'}**\nAdded ${added} of ${tracks.length} track(s).${skipped ? ` Skipped ${skipped} duplicate(s).` : ''}`,
-            ),
-        };
+    if (!track) {
+        throw new TitanBotError(
+            'No results',
+            ErrorTypes.USER_INPUT,
+            'No results found for that query.',
+        );
     }
 
-    if (
-        loadType === 'search'
-        || loadType === 'track'
-        || loadType === 'SEARCH_RESULT'
-        || loadType === 'TRACK_LOADED'
-    ) {
-        const track = tracks?.[0];
-        if (!track) {
-            throw new TitanBotError('No results', ErrorTypes.USER_INPUT, 'No results found for that query.');
-        }
-
-        if (isDuplicateTrack(player, track)) {
-            throw new TitanBotError(
-                'Duplicate track',
-                ErrorTypes.USER_INPUT,
-                `**${track.info.title}** is already in the queue or playing.`,
-            );
-        }
-
-        track.info.requester = interaction.user;
-
-        const willPlayNow = !player.playing && !player.paused;
-        player.queue.add(track);
-        const queuePosition = player.queue.length;
-
-        if (willPlayNow) {
-            await startPlayback(player);
-        }
-
-        return {
-            embed: successEmbed(
-                willPlayNow ? 'Now Playing' : 'Track Added',
-                willPlayNow
-                    ? `**${track.info.title}**\n${track.info.author}`
-                    : `**${track.info.title}**\n${track.info.author}\nPosition: #${queuePosition} in queue`,
-            ),
-        };
+    if (isDuplicateTrack(player, track)) {
+        throw new TitanBotError(
+            'Duplicate track',
+            ErrorTypes.USER_INPUT,
+            `**${track.info?.title || 'This track'}** is already in the queue or playing.`,
+        );
     }
 
-    throw new TitanBotError('No results', ErrorTypes.USER_INPUT, `No results found. (loadType: ${loadType})`);
+    track.info.requester = interaction.user;
+
+    const willPlayNow = !player.playing && !player.paused;
+
+    player.queue.add(track);
+
+    const queuePosition = player.queue.length;
+
+    if (willPlayNow) {
+        await startPlayback(player);
+    }
+
+    return {
+        embed: successEmbed(
+            willPlayNow ? 'Now Playing' : 'Track Added',
+            willPlayNow
+                ? `**${track.info.title}**\n${track.info.author}`
+                : `**${track.info.title}**\n${track.info.author}\nPosition: #${queuePosition} in queue`,
+        ),
+    };
 }
 
 export async function skipTrack(client, interaction) {
