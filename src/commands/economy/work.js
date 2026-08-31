@@ -1,6 +1,7 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { createEmbed } from '../../utils/embeds.js';
 import { getEconomyData, saveEconomyData } from '../../utils/economy.js';
+import { createMeowieeGame } from '../../utils/meowieeWorkGame.js';
 import {
     withErrorHandling,
     createError,
@@ -47,9 +48,9 @@ export default {
             );
 
             const embed = createEmbed({
-                title: '⏰ Still Working!',
+                title: '⏰ No Available Task',
                 description:
-                    `You've already worked recently!\n\n` +
+                    `There are no available work tasks right now.\n\n` +
                     `Come back in **${minutes}m ${seconds}s** to get another task.`,
             });
 
@@ -60,36 +61,67 @@ export default {
             return;
         }
 
-        // Random reward between 20 and 80
+        // Random reward for normal 10-message work
         const reward =
             Math.floor(Math.random() * (REWARD_MAX - REWARD_MIN + 1)) +
             REWARD_MIN;
 
-        // Create a new task
-        data.workTask = {
-            type: 'messages',
-            required: TASK_AMOUNT,
-            progress: 0,
-            reward,
-            startedAt: now,
-            expiresAt: now + (30 * 60 * 1000),
-        };
+        // 50/50 chance:
+        // true  = Meowiee mini-game
+        // false = normal 10-message work
+        const isMiniGame = Math.random() < 0.5;
+
+        if (isMiniGame) {
+            // 🐱 Meowiee mini-game
+            data.workTask = createMeowieeGame(now);
+        } else {
+            // 💼 Normal 10-message work
+            data.workTask = {
+                type: 'messages',
+                required: TASK_AMOUNT,
+                progress: 0,
+                reward,
+                startedAt: now,
+                expiresAt: now + (30 * 60 * 1000),
+            };
+        }
 
         data.lastWork = now;
 
         await saveEconomyData(client, guildId, userId, data);
 
-        const embed = createEmbed({
-            title: '🐱 New Work Task!',
-            description:
-                `Your shift has started!\n\n` +
-                `💼 **Task:** Send **${TASK_AMOUNT} messages** in this server.\n` +
-                `📊 **Progress:** **0/${TASK_AMOUNT}**\n` +
-                `💰 **Reward:** **${reward.toLocaleString()} MeowCoins**\n\n` +
-                `⏰ You have **30 minutes** to complete the task!`,
-        }).setFooter({
-            text: 'Get chatting and complete your shift! 🐾',
-        });
+        let embed;
+
+        // 🐱 Meowiee mini-game embed
+        if (data.workTask.type === 'meowiee_game') {
+            const destination = data.workTask.destination;
+
+            embed = createEmbed({
+                title: '🐱 Meowiee Work!',
+                description:
+                    `Meowiee has a job for you!\n\n` +
+                    `📍 **Take Meowiee to:** ${destination.emoji} **${destination.name}**\n` +
+                    `💰 **Reward:** **${data.workTask.reward} MeowCoins**\n\n` +
+                    `⏰ You have **5 minutes** to complete the job!\n\n` +
+                    `🐾 Guide Meowiee to the correct shop before she runs away!`,
+            }).setFooter({
+                text: 'Don\'t lose control of Meowiee! 🐾',
+            });
+
+        // 💼 Normal work embed
+        } else {
+            embed = createEmbed({
+                title: '🐱 New Work Task!',
+                description:
+                    `Your shift has started!\n\n` +
+                    `💼 **Task:** Send **${TASK_AMOUNT} messages** in this server.\n` +
+                    `📊 **Progress:** **0/${TASK_AMOUNT}**\n` +
+                    `💰 **Reward:** **${reward.toLocaleString()} MeowCoins**\n\n` +
+                    `⏰ You have **30 minutes** to complete your shift!`,
+            }).setFooter({
+                text: 'Get chatting and complete your shift! 🐾',
+            });
+        }
 
         await InteractionHelper.safeEditReply(interaction, {
             embeds: [embed],
