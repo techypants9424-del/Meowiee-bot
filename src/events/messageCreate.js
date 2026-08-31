@@ -136,62 +136,141 @@ async function handleWorkTask(message, client) {
     const guildId = message.guild.id;
     const userId = message.author.id;
 
-    const data = await getEconomyData(client, guildId, userId);
+    const data = await getEconomyData(
+      client,
+      guildId,
+      userId
+    );
 
     const task = data.workTask;
 
-    // No active work task
+    // ==========================================
+    // NO ACTIVE WORK TASK
+    // ==========================================
+
     if (!task) {
       return;
     }
 
-    // Task expired
+    // Only handle normal message work
+    if (task.type !== 'messages') {
+      return;
+    }
+
+    // ==========================================
+    // CHECK EXPIRATION
+    // ==========================================
+
     if (Date.now() > task.expiresAt) {
       delete data.workTask;
-      await saveEconomyData(client, guildId, userId, data);
+
+      await saveEconomyData(
+        client,
+        guildId,
+        userId,
+        data
+      );
 
       await message.channel.send({
-        content: `⏰ <@${userId}> your work task expired! Run \`/work\` to get a new task.`,
+        content:
+          `⏰ <@${userId}> your work task expired!\n` +
+          `Run \`/work\` to get a new task.`,
       }).catch(() => {});
 
       return;
     }
 
-    // Only count message tasks
-    if (task.type !== 'messages') {
-      return;
-    }
+    // ==========================================
+    // CHECK MESSAGE
+    // ==========================================
 
-    // Don't count empty messages
     if (!message.content || !message.content.trim()) {
       return;
     }
 
-    // Increase progress
-    task.progress += 1;
+    /*
+     * Count LETTERS only.
+     *
+     * Example:
+     * "meow"     = 4 ✅
+     * "hello"    = 5 ✅
+     * "cat"      = 3 ❌
+     * "testing"  = 7 ❌
+     * "meow!"    = 4 ✅
+     * "1234"     = 0 ❌
+     *
+     * Spaces, numbers and symbols are ignored.
+     */
 
-    // Task completed
+    const letterCount = (
+      message.content.match(/[a-zA-Z]/g) || []
+    ).length;
+
+    // Must contain exactly 4–5 letters
+    if (letterCount < 4 || letterCount > 5) {
+      return;
+    }
+
+    // ==========================================
+    // INCREASE PROGRESS
+    // ==========================================
+
+    task.progress = (task.progress || 0) + 1;
+
+    // ==========================================
+    // WORK COMPLETE
+    // ==========================================
+
     if (task.progress >= task.required) {
-      const reward = task.reward;
+      const reward = Number(task.reward) || 0;
 
       data.wallet = (data.wallet || 0) + reward;
 
       delete data.workTask;
 
-      await saveEconomyData(client, guildId, userId, data);
+      await saveEconomyData(
+        client,
+        guildId,
+        userId,
+        data
+      );
 
       await message.channel.send({
         content:
           `🎉 **Work Complete!**\n\n` +
           `<@${userId}> completed their work task!\n` +
+          `📊 **${task.required}/${task.required}** messages\n` +
           `💰 You earned **${reward.toLocaleString()} MeowCoins**!`,
       }).catch(() => {});
 
       return;
     }
 
-    // Save progress
-    await saveEconomyData(client, guildId, userId, data);
+    // ==========================================
+    // SAVE PROGRESS
+    // ==========================================
+
+    await saveEconomyData(
+      client,
+      guildId,
+      userId,
+      data
+    );
+
+    // ==========================================
+    // DISPLAY PROGRESS
+    // ==========================================
+
+    const displayName =
+      message.member?.displayName ||
+      message.author.globalName ||
+      message.author.username;
+
+    await message.channel.send({
+      content:
+        `**${displayName}**\n` +
+        `${message.content} **(${task.progress}/${task.required})**`,
+    }).catch(() => {});
 
   } catch (error) {
     logger.error('Error handling work task:', error);
