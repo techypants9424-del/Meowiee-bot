@@ -143,7 +143,7 @@ const panelImage = interaction.options.getString("panel_image");
             const maxTicketsPerUser = interaction.options.getInteger("max_tickets_per_user") || 3;
 const dmOnClose = interaction.options.getBoolean("dm_on_close") !== false;
 
-            cconst setupEmbed = createEmbed({
+            const setupEmbed = createEmbed({
     title: "Support Tickets",
     description: panelMessage,
     color: getColor('info')
