@@ -294,10 +294,36 @@ async function registerGlobalCommands(client, clientId, commands, totalSubcomman
 }
 export async function registerCommands(client, options = {}) {
     const { clientId = null } = options;
+
     logger.info("🔥 REGISTER COMMANDS FUNCTION CALLED");
+
     try {
         const { commands, totalSubcommands } = collectCommandPayloads(client);
-        await registerGlobalCommands(client, clientId, commands, totalSubcommands);
+
+        logger.info(`🔥 TOTAL COMMANDS: ${commands.length}`);
+
+        const ticketCommand = commands.find(cmd => cmd.name === 'ticket');
+
+        logger.info(`🔥 TICKET FOUND: ${!!ticketCommand}`);
+
+        if (ticketCommand) {
+            const setup = ticketCommand.options?.find(
+                opt => opt.name === 'setup'
+            );
+
+            logger.info(
+                `🔥 TICKET OPTIONS: ${JSON.stringify(
+                    setup?.options?.map(o => o.name)
+                )}`
+            );
+        }
+
+        await registerGlobalCommands(
+            client,
+            clientId,
+            commands,
+            totalSubcommands
+        );
     } catch (error) {
         logger.error('Error registering commands:', error);
         throw error;
