@@ -246,6 +246,7 @@ async function registerGlobalCommands(client, clientId, commands, totalSubcomman
     }
 
     logger.info(`Preparing to register ${totalSubcommands + commands.length} commands globally`);
+
     logger.info('Validating commands before registration...');
     validateCommands(commands);
     logger.info('Command validation passed');
@@ -254,23 +255,43 @@ async function registerGlobalCommands(client, clientId, commands, totalSubcomman
 
     if (botConfig.commands?.deleteCommands) {
         logger.info('Clearing existing global commands before registration...');
-        await client.rest.put(`/applications/${clientId}/commands`, { body: [] });
+        await client.rest.put(`/applications/${clientId}/commands`, {
+            body: []
+        });
     }
 
-   logger.info(`Registering ${commandsToRegister.length} global commands...`);
+    logger.info(`Registering ${commandsToRegister.length} global commands...`);
 
-const ticketCommand = commandsToRegister.find(cmd => cmd.name === 'ticket');
+    const ticketCommand = commandsToRegister.find(
+        cmd => cmd.name === 'ticket'
+    );
 
-if (ticketCommand) {
-    const setup = ticketCommand.options?.find(opt => opt.name === 'setup');
-    logger.info(`TICKET SETUP OPTIONS: ${JSON.stringify(setup?.options?.map(o => o.name))}`);
+    logger.info(`TICKET COMMAND FOUND: ${!!ticketCommand}`);
+
+    if (ticketCommand) {
+        const setup = ticketCommand.options?.find(
+            opt => opt.name === 'setup'
+        );
+
+        logger.info(
+            `TICKET SETUP OPTIONS: ${JSON.stringify(
+                setup?.options?.map(o => o.name)
+            )}`
+        );
+    }
+
+    await client.rest.put(`/applications/${clientId}/commands`, {
+        body: commandsToRegister
+    });
+
+    logger.info(
+        `Successfully registered ${commandsToRegister.length} global commands`
+    );
+
+    logger.info(
+        'Global commands may take up to an hour to appear in all servers on first deploy'
+    );
 }
-
-await client.rest.put(`/applications/${clientId}/commands`, { body: commandsToRegister });
-    logger.info(`Successfully registered ${commandsToRegister.length} global commands`);
-    logger.info('Global commands may take up to an hour to appear in all servers on first deploy');
-}
-
 export async function registerCommands(client, options = {}) {
     const { clientId = null } = options;
 
