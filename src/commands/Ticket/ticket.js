@@ -143,13 +143,13 @@ const panelImage = interaction.options.getString("panel_image");
             const maxTicketsPerUser = interaction.options.getInteger("max_tickets_per_user") || 3;
 const dmOnClose = interaction.options.getBoolean("dm_on_close") !== false;
 
-            const setupEmbed = createEmbed({ 
-    title: "Support Tickets", 
+            cconst setupEmbed = createEmbed({
+    title: "Support Tickets",
     description: panelMessage,
     color: getColor('info')
 });
 
-if (panelImage) {
+if (panelImage && /^https?:\/\/.+/i.test(panelImage)) {
     setupEmbed.setImage(panelImage);
 }
 
@@ -174,11 +174,11 @@ if (panelImage) {
                     currentConfig.ticketStaffRoleId = staffRole ? staffRole.id : null;
                     currentConfig.ticketPanelChannelId = panelChannel.id;
                     currentConfig.ticketPanelMessageId = sentPanel?.id || null;
-                    currentConfig.ticketPanelMessage = panelMessage;
-                    currentConfig.ticketButtonLabel = buttonLabel;
-                    currentConfig.maxTicketsPerUser = maxTicketsPerUser;
+                   currentConfig.ticketPanelMessage = panelMessage;
+                   currentConfig.ticketButtonLabel = buttonLabel;
+                   currentConfig.ticketPanelImage = panelImage || null;
+                   currentConfig.maxTicketsPerUser = maxTicketsPerUser;
                     currentConfig.dmOnClose = dmOnClose;
-
                     await setGuildConfig(client, interaction.guildId, currentConfig);
                     logger.info('Ticket configuration saved', {
                         guildId: interaction.guildId,
