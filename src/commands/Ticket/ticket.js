@@ -37,6 +37,12 @@ export default {
                         )
                         .setRequired(true),
                 )
+            .addStringOption((option) =>
+    option
+        .setName("panel_image")
+        .setDescription("Image URL to display in the ticket panel (optional).")
+        .setRequired(false),
+)
                 .addStringOption((option) =>
                     option
                         .setName("button_label")
@@ -130,6 +136,7 @@ export default {
             const closedCategoryChannel = interaction.options.getChannel("closed_category");
             const staffRole = interaction.options.getRole("staff_role");
 const panelMessage = interaction.options.getString("panel_message") || "Click the button below to create a support ticket.";
+const panelImage = interaction.options.getString("panel_image");
             const buttonLabel =
                 interaction.options.getString("button_label") ||
 "Create Ticket";
@@ -137,10 +144,14 @@ const panelMessage = interaction.options.getString("panel_message") || "Click th
 const dmOnClose = interaction.options.getBoolean("dm_on_close") !== false;
 
             const setupEmbed = createEmbed({ 
-                title: "Support Tickets", 
-description: panelMessage,
-                color: getColor('info')
-            });
+    title: "Support Tickets", 
+    description: panelMessage,
+    color: getColor('info')
+});
+
+if (panelImage) {
+    setupEmbed.setImage(panelImage);
+}
 
             const ticketButton = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
