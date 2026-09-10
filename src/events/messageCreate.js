@@ -24,6 +24,7 @@ import { getEconomyData, saveEconomyData } from '../utils/economy.js';
 
 const MESSAGE_XP_RATE_LIMIT_ATTEMPTS = 12;
 const MESSAGE_XP_RATE_LIMIT_WINDOW_MS = 10000;
+const aiResponseIds = new Map();
 
 
 export default {
@@ -41,6 +42,11 @@ if (countingProcessed) {
 }
 
 await handlePrefixCommand(message, client);
+
+const aiProcessed = await handleMeowieeAI(message, client);
+if (aiProcessed) {
+  return;
+}
 
 const reactionProcessed = await handleMeowieeReactions(message);
 if (reactionProcessed) {
@@ -473,12 +479,9 @@ async function handleMeowieeAI(message, client) {
     await message.channel.sendTyping().catch(() => {});
 
     // Continue conversation if replying to an AI message
-    const previousResponseId =
-      referencedMessage?.author?.id === botId
-        ? referencedMessage.embeds?.[0]?.footer?.text?.startsWith('ai:')
-          ? referencedMessage.embeds[0].footer.text.slice(3)
-          : null
-        : null;
+   const previousResponseId = referencedMessage
+  ? aiResponseIds.get(referencedMessage.id) || null
+  : null;
 
     const result = await askMeowiee(content, previousResponseId);
 
