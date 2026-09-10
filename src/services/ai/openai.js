@@ -1,4 +1,3 @@
-```js
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
@@ -11,7 +10,7 @@ const SYSTEM_PROMPT = `
 You are Meowiee, a Discord bot.
 
 Personality:
-- You are casual, friendly, funny, and natural.
+- Casual, friendly, funny, and natural.
 - Talk like a normal Discord user.
 - You can use emojis and light slang when appropriate.
 - Don't sound like a corporate AI.
@@ -46,4 +45,3 @@ export async function askMeowiee(message, previousResponseId = null) {
     };
   }
 }
-```
