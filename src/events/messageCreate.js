@@ -434,6 +434,73 @@ async function handlePingReaction(message) {
     logger.error('Failed to react to ping:', error);
   }
 }
+async function handleMeowieeAI(message, client) {
+  try {
+    const botId = client.user.id;
+
+    // Check if this message mentions Meowiee
+    const mentioned = message.mentions.users.has(botId);
+
+    // Check if this message is a reply to Meowiee
+    let replyingToMeowiee = false;
+    let referencedMessage = null;
+
+    if (message.reference?.messageId) {
+      referencedMessage = await message.channel.messages
+        .fetch(message.reference.messageId)
+        .catch(() => null);
+
+      if (referencedMessage?.author?.id === botId) {
+        replyingToMeowiee = true;
+      }
+    }
+
+    // Ignore messages that aren't mentions or replies to Meowiee
+    if (!mentioned && !replyingToMeowiee) {
+      return false;
+    }
+
+    // Remove the @Meowiee mention from the message
+    let content = message.content
+      .replace(new RegExp(`<@!?${botId}>`, 'g'), '')
+      .trim();
+
+    if (!content) {
+      content = 'yo';
+    }
+
+    // Show Discord's thinking indicator
+    await message.channel.sendTyping().catch(() => {});
+
+    // Continue conversation if replying to an AI message
+    const previousResponseId =
+      referencedMessage?.author?.id === botId
+        ? referencedMessage.embeds?.[0]?.footer?.text?.startsWith('ai:')
+          ? referencedMessage.embeds[0].footer.text.slice(3)
+          : null
+        : null;
+
+    const result = await askMeowiee(content, previousResponseId);
+
+    const reply = await message.reply({
+      content: result.text,
+      allowedMentions: {
+        repliedUser: false,
+      },
+    });
+
+    // Store the OpenAI response ID in the message footer
+    if (result.responseId) {
+      // We can't edit normal text with metadata, so save it in memory below.
+      aiResponseIds.set(reply.id, result.responseId);
+    }
+
+    return true;
+  } catch (error) {
+    logger.error('Error handling Meowiee AI:', error);
+    return false;
+  }
+}
 async function handleCountingGame(message, client) {
   try {
     const config = await getCountingGameConfig(client, message.guild.id);
