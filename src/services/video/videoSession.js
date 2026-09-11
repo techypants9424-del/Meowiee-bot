@@ -1,4 +1,4 @@
-class VideoSession {
+export default class VideoSession {
     constructor(guildId) {
         this.guildId = guildId;
         this.url = null;
@@ -38,9 +38,7 @@ class VideoSession {
             title: this.title,
             episode: this.episode,
             playing: this.playing,
-            startedAt: this.startedAt
+            startedAt: this.startedAt,
         };
     }
 }
-
-module.exports = VideoSession;
