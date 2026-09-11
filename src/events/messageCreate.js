@@ -512,7 +512,7 @@ async function handleMeowieeAI(message, client) {
     client,
     discordMessage: message,
     memory,
-    conversationHistory: [],
+    conversationHistory,
     tools: aiTools,
 });
 
