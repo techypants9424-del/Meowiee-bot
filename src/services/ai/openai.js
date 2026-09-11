@@ -11,6 +11,60 @@ const openai = new OpenAI({
 const MODEL = 'openai/gpt-oss-120b';
 const MAX_TOOL_ROUNDS = 3;
 
+/*
+ * Your aiTools.js uses the Responses API tool format:
+ *
+ * {
+ *   type: 'function',
+ *   name: 'create_channel',
+ *   description: '...',
+ *   parameters: {...}
+ * }
+ *
+ * Chat Completions expects:
+ *
+ * {
+ *   type: 'function',
+ *   function: {
+ *      name: 'create_channel',
+ *      description: '...',
+ *      parameters: {...}
+ *   }
+ * }
+ *
+ * This converts your existing tools automatically.
+ */
+function convertToolsForChat(tools = []) {
+    return tools.map((tool) => {
+        if (
+            tool?.type === 'function' &&
+            tool?.function
+        ) {
+            return tool;
+        }
+
+        return {
+            type: 'function',
+            function: {
+                name: tool.name,
+                description: tool.description,
+                parameters:
+                    tool.parameters || {
+                        type: 'object',
+                        properties: {},
+                        additionalProperties: false,
+                    },
+
+                ...(tool.strict !== undefined
+                    ? {
+                          strict: tool.strict,
+                      }
+                    : {}),
+            },
+        };
+    });
+}
+
 const SYSTEM_PROMPT = `
 You are Meowiee, a Discord bot and a real Discord friend.
 
@@ -42,18 +96,50 @@ GIFS:
 - Never create or invent GIF URLs.
 
 MUSIC:
-- If the user asks you to play music, use the play_music tool.
+- If the user asks you to play music, ALWAYS use the play_music tool.
+- Do not just explain how to play music.
 - Never claim music started unless the tool succeeds.
 
 SERVER MANAGEMENT:
-- Use channel tools when the user clearly asks to create or delete a channel.
-- Use role tools when the user clearly asks to create or delete a role.
-- Creating/deleting channels requires Manage Channels.
+- If the user asks to create a channel, ALWAYS use create_channel.
+- If the user asks to rename a channel, ALWAYS use rename_channel.
+- If the user asks to delete a channel, ALWAYS use delete_channel.
+- If the user asks to create a role, ALWAYS use create_role.
+- If the user asks to delete a role, ALWAYS use delete_role.
+
+CHANNEL RENAMING:
+- If the user says something like:
+  "rename #general to memes"
+  "change name of #meowww to Meowiee"
+  "rename channel meowww to meowiee"
+  then immediately call rename_channel.
+- Do NOT ask for the current channel name if it is already provided.
+- Extract the current channel name and the new name from the user's message.
+- If the user gives a channel mention such as #meowww, use "meowww" as channelName.
+- Do not treat a clear rename request as normal conversation.
+
+CHANNEL CREATION:
+- If the user says:
+  "make a channel named Meowiee"
+  "create a channel called memes"
+  then immediately call create_channel.
+- Do not respond with a normal greeting.
+- Use type "text" unless the user specifically asks for voice, category, or announcement.
+
+PERMISSIONS:
+- Creating/deleting/renaming channels requires Manage Channels.
 - Creating/deleting roles requires Manage Roles.
 - Discord permissions are enforced by the bot.
 - Never bypass Discord permissions.
-- Never claim an action succeeded if it failed.
+- Never claim an action succeeded unless the tool reports success.
 - Never delete anything unless the user clearly asks.
+
+TOOL USAGE:
+- When a user clearly asks for an action that matches a tool, use the tool.
+- Do not ask unnecessary clarification questions when all required information is already present.
+- After a successful tool call, briefly tell the user what happened.
+- If a tool fails, explain the failure naturally.
+- Never pretend a tool was used if it wasn't.
 
 CONVERSATION:
 - Use the stored memory and recent conversation provided to you.
@@ -68,30 +154,46 @@ IMPORTANT:
 - Keep responses concise.
 `;
 
-async function createAIResponse(input, tools = []) {
+async function createAIResponse(
+    messages,
+    tools = [],
+) {
     const started = Date.now();
 
     console.log('[AI] Sending request to Groq...');
 
     try {
-        const response = await openai.responses.create({
+        const request = {
             model: MODEL,
-            instructions: SYSTEM_PROMPT,
-            input,
+            messages,
+            tool_choice: tools.length
+                ? 'auto'
+                : 'none',
+            parallel_tool_calls: false,
+            reasoning_effort: 'low',
+        };
 
-            ...(tools?.length
-                ? { tools }
-                : {}),
-        });
+        if (tools.length) {
+            request.tools = tools;
+        }
+
+        const response =
+            await openai.chat.completions.create(
+                request,
+            );
 
         console.log(
-            `[AI] Groq responded in ${Date.now() - started}ms`,
+            `[AI] Groq responded in ${
+                Date.now() - started
+            }ms`,
         );
 
         return response;
     } catch (error) {
         console.error(
-            `[AI] Groq failed after ${Date.now() - started}ms`,
+            `[AI] Groq failed after ${
+                Date.now() - started
+            }ms`,
         );
 
         console.error(
@@ -100,10 +202,14 @@ async function createAIResponse(input, tools = []) {
             }`,
         );
 
+        /*
+         * Groq rate limit.
+         */
         if (
             error?.status === 429 ||
             error?.statusCode === 429 ||
-            error?.code === 'rate_limit_exceeded'
+            error?.code ===
+                'rate_limit_exceeded'
         ) {
             throw new Error(
                 'GROQ_RATE_LIMIT: bro I ran outta brain juice 😭 try again later',
@@ -124,38 +230,77 @@ export async function askMeowiee(
         tools = [],
     } = {},
 ) {
-    if (!message || typeof message !== 'string') {
-        throw new Error('Invalid message.');
+    if (
+        !message ||
+        typeof message !== 'string'
+    ) {
+        throw new Error(
+            'Invalid message.',
+        );
     }
 
     if (!client) {
-        throw new Error('Discord client missing.');
+        throw new Error(
+            'Discord client missing.',
+        );
     }
 
     if (!discordMessage) {
-        throw new Error('Discord message missing.');
+        throw new Error(
+            'Discord message missing.',
+        );
     }
 
     /*
-     * Keep only recent history so requests stay small.
+     * Convert your existing aiTools.js
+     * into Groq Chat Completions format.
      */
-    const history = Array.isArray(conversationHistory)
+    const chatTools =
+        convertToolsForChat(tools);
+
+    /*
+     * Keep recent conversation.
+     */
+    const history = Array.isArray(
+        conversationHistory,
+    )
         ? conversationHistory.slice(-6)
         : [];
 
-    const historyText = history
-        .map((item) => {
-            const speaker =
+    /*
+     * Build messages.
+     */
+    const messages = [
+        {
+            role: 'system',
+            content: SYSTEM_PROMPT,
+        },
+    ];
+
+    /*
+     * Add recent conversation.
+     */
+    for (const item of history) {
+        if (
+            !item?.content ||
+            typeof item.content !==
+                'string'
+        ) {
+            continue;
+        }
+
+        messages.push({
+            role:
                 item.role === 'assistant'
-                    ? 'Meowiee'
-                    : 'User';
+                    ? 'assistant'
+                    : 'user',
+            content: item.content,
+        });
+    }
 
-            return `${speaker}: ${String(
-                item.content || '',
-            )}`;
-        })
-        .join('\n');
-
+    /*
+     * Build current context.
+     */
     const context = [];
 
     if (memory) {
@@ -164,16 +309,10 @@ export async function askMeowiee(
         );
     }
 
-    if (historyText) {
-        context.push(
-            `RECENT CONVERSATION:\n${historyText}`,
-        );
-    }
-
     context.push(
         `USER: ${
-            discordMessage.author?.username ||
-            'Unknown User'
+            discordMessage.author
+                ?.username || 'Unknown User'
         }`,
     );
 
@@ -187,68 +326,108 @@ export async function askMeowiee(
         `CURRENT MESSAGE:\n${message}`,
     );
 
-    const input = [
-        {
-            role: 'user',
-            content: context.join('\n\n'),
-        },
-    ];
+    messages.push({
+        role: 'user',
+        content: context.join('\n\n'),
+    });
 
     /*
-     * First AI request.
+     * Initial request.
      */
-    let response = await createAIResponse(
-        input,
-        tools,
-    );
+    let response =
+        await createAIResponse(
+            messages,
+            chatTools,
+        );
 
     /*
-     * Handle function/tool calls.
+     * Tool loop.
      */
     for (
         let round = 0;
         round < MAX_TOOL_ROUNDS;
         round++
     ) {
-        const toolCalls = (
-            response.output || []
-        ).filter(
-            (item) =>
-                item.type === 'function_call',
-        );
+        const choice =
+            response?.choices?.[0];
+
+        if (!choice) {
+            throw new Error(
+                'Groq returned an invalid response.',
+            );
+        }
+
+        const assistantMessage =
+            choice.message;
+
+        const toolCalls =
+            assistantMessage?.tool_calls ||
+            [];
 
         /*
-         * Normal response — no tools needed.
+         * No tool call = normal AI response.
          */
         if (!toolCalls.length) {
-            break;
+            const text =
+                assistantMessage?.content?.trim();
+
+            if (!text) {
+                throw new Error(
+                    'Groq returned no text.',
+                );
+            }
+
+            return {
+                text,
+                responseId: response.id,
+                output: [
+                    assistantMessage,
+                ],
+            };
         }
 
         console.log(
-            `[AI] Tool round ${round + 1}: ${
+            `[AI] Tool round ${
+                round + 1
+            }: ${
                 toolCalls.length
             } tool call(s)`,
         );
 
-        const toolOutputs = [];
+        /*
+         * Add the assistant tool-call message
+         * back into the conversation.
+         */
+        messages.push(
+            assistantMessage,
+        );
 
+        /*
+         * Execute every requested tool.
+         */
         for (const toolCall of toolCalls) {
+            const toolName =
+                toolCall?.function?.name;
+
             let args = {};
 
             try {
                 args = JSON.parse(
-                    toolCall.arguments || '{}',
+                    toolCall?.function
+                        ?.arguments || '{}',
                 );
             } catch (error) {
                 console.error(
-                    `[AI] Failed to parse ${toolCall.name} arguments:`,
+                    `[AI] Failed to parse arguments for ${toolName}:`,
                     error,
                 );
 
-                toolOutputs.push({
-                    type: 'function_call_output',
-                    call_id: toolCall.call_id,
-                    output: JSON.stringify({
+                messages.push({
+                    role: 'tool',
+                    tool_call_id:
+                        toolCall.id,
+                    name: toolName,
+                    content: JSON.stringify({
                         success: false,
                         message:
                             'Invalid tool arguments.',
@@ -259,24 +438,26 @@ export async function askMeowiee(
             }
 
             console.log(
-                `[AI] Executing tool: ${toolCall.name}`,
+                `[AI] Executing tool: ${toolName}`,
                 args,
             );
 
-            const toolStarted = Date.now();
+            const toolStarted =
+                Date.now();
 
             let result;
 
             try {
-                result = await executeAITool(
-                    toolCall.name,
-                    args,
-                    discordMessage,
-                    client,
-                );
+                result =
+                    await executeAITool(
+                        toolName,
+                        args,
+                        discordMessage,
+                        client,
+                    );
             } catch (error) {
                 console.error(
-                    `[AI] Tool ${toolCall.name} failed:`,
+                    `[AI] Tool ${toolName} failed:`,
                     error,
                 );
 
@@ -288,42 +469,38 @@ export async function askMeowiee(
             }
 
             console.log(
-                `[AI] Tool ${toolCall.name} finished in ${
-                    Date.now() - toolStarted
+                `[AI] Tool ${toolName} finished in ${
+                    Date.now() -
+                    toolStarted
                 }ms`,
             );
 
-            toolOutputs.push({
-                type: 'function_call_output',
-                call_id: toolCall.call_id,
-                output: JSON.stringify(result),
+            /*
+             * Send the tool result back to Groq.
+             */
+            messages.push({
+                role: 'tool',
+                tool_call_id:
+                    toolCall.id,
+                name: toolName,
+                content: JSON.stringify(
+                    result,
+                ),
             });
         }
 
         /*
-         * Send tool results back to Groq.
+         * Ask Groq what to say after
+         * the tool has finished.
          */
-        response = await createAIResponse(
-            [
-                ...(response.output || []),
-                ...toolOutputs,
-            ],
-            tools,
-        );
+        response =
+            await createAIResponse(
+                messages,
+                chatTools,
+            );
     }
 
-    const text =
-        response.output_text?.trim();
-
-    if (!text) {
-        throw new Error(
-            'Groq returned no text.',
-        );
-    }
-
-    return {
-        text,
-        responseId: response.id,
-        output: response.output || [],
-    };
+    throw new Error(
+        'AI tool loop reached its maximum rounds.',
+    );
 }
