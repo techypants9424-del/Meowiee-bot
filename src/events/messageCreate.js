@@ -1,6 +1,5 @@
 import { Events, EmbedBuilder } from 'discord.js';
 import { logger } from '../utils/logger.js';
-import { askMeowiee } from '../services/ai/openai.js';
 import { getLevelingConfig, getUserLevelData } from '../services/leveling/leveling.js';
 import { addXp } from '../services/leveling/xpSystem.js';
 import { checkRateLimit } from '../utils/rateLimiter.js';
@@ -14,6 +13,15 @@ import { enforceAbuseProtection, formatCooldownDuration } from '../utils/abusePr
 import { createEmbed } from '../utils/embeds.js';
 import { isCommandEnabled } from '../services/commandAccessService.js';
 import { handleMeowEvent } from '../services/meowEventService.js';
+import { askMeowiee } from '../services/ai/openai.js';
+import {
+    getUserMemory,
+    addUserMemory,
+    getConversationHistory,
+    addConversationMessage,
+} from '../services/ai/aiMemory.js';
+import { aiTools } from '../services/ai/aiTools.js';
+import { executeAITool } from '../services/ai/aiToolExecutor.js';
 import {
   getCountingGameConfig,
   saveCountingGameConfig,
@@ -440,58 +448,208 @@ async function handlePingReaction(message) {
   }
 }
 async function handleMeowieeAI(message, client) {
-  try {
-    const botId = client.user.id;
+    try {
+        const botId = client.user.id;
 
-    // Check if Meowiee was mentioned
-    const mentioned = message.mentions.users.has(botId);
+        // Check if Meowiee was mentioned
+        const mentioned = message.mentions.users.has(botId);
 
-    // Check if this is a reply to Meowiee
-    let replyingToMeowiee = false;
+        // Check if this is a reply to Meowiee
+        let replyingToMeowiee = false;
 
-    if (message.reference?.messageId) {
-      const referencedMessage = await message.channel.messages
-        .fetch(message.reference.messageId)
-        .catch(() => null);
+        if (message.reference?.messageId) {
+            const referencedMessage = await message.channel.messages
+                .fetch(message.reference.messageId)
+                .catch(() => null);
 
-      if (referencedMessage?.author?.id === botId) {
-        replyingToMeowiee = true;
-      }
+            if (referencedMessage?.author?.id === botId) {
+                replyingToMeowiee = true;
+            }
+        }
+
+        // Only respond to mentions or replies to Meowiee
+        if (!mentioned && !replyingToMeowiee) {
+            return false;
+        }
+
+        // Remove the Meowiee mention
+        let content = message.content
+            .replace(new RegExp(`<@!?${botId}>`, 'g'), '')
+            .trim();
+
+        if (!content) {
+            content = 'yo';
+        }
+
+        await message.channel.sendTyping().catch(() => {});
+
+        // ==========================================
+        // LOAD MEMORY
+        // ==========================================
+
+        const memoryData = await getUserMemory(
+            client,
+            message.author.id,
+        );
+
+        const memory = memoryData.facts.join('\n');
+
+        // ==========================================
+        // LOAD RECENT CONVERSATION
+        // ==========================================
+
+        const conversationHistory =
+            await getConversationHistory(
+                client,
+                `${message.channel.id}:${message.author.id}`,
+            );
+
+        // ==========================================
+        // SAVE USER MESSAGE
+        // ==========================================
+
+        await addConversationMessage(
+            client,
+            `${message.channel.id}:${message.author.id}`,
+            'user',
+            content,
+            message.author.id,
+        );
+
+        // ==========================================
+        // ASK AI
+        // ==========================================
+
+        let result = await askMeowiee(content, {
+            memory,
+            conversationHistory,
+            tools: aiTools,
+        });
+
+        // ==========================================
+        // HANDLE AI TOOL CALLS
+        // ==========================================
+
+        const toolOutputs = [];
+
+        for (const output of result.output || []) {
+            if (output.type !== 'function_call') {
+                continue;
+            }
+
+            const toolName = output.name;
+
+            let args = {};
+
+            try {
+                args = JSON.parse(output.arguments || '{}');
+            } catch (error) {
+                console.error(
+                    `Failed to parse AI tool arguments for ${toolName}:`,
+                    error,
+                );
+
+                toolOutputs.push({
+                    type: 'function_call_output',
+                    call_id: output.call_id,
+                    output: JSON.stringify({
+                        success: false,
+                        message: 'Invalid tool arguments.',
+                    }),
+                });
+
+                continue;
+            }
+
+            console.log(
+                `Meowiee AI tool: ${toolName}`,
+                args,
+            );
+
+            // Execute the actual Discord action
+            const toolResult = await executeAITool(
+                toolName,
+                args,
+                message,
+                client,
+            );
+
+            toolOutputs.push({
+                type: 'function_call_output',
+                call_id: output.call_id,
+                output: JSON.stringify(toolResult),
+            });
+        }
+
+        // ==========================================
+        // SEND TOOL RESULTS BACK TO AI
+        // ==========================================
+
+        if (toolOutputs.length > 0) {
+            const followUp = await openai.responses.create({
+                model: 'gpt-5.6-luna',
+                instructions: `
+You are Meowiee.
+
+Reply naturally to the Discord user based on the tool results.
+
+Rules:
+- Be casual and natural.
+- Keep it short.
+- Do not sound like a corporate AI.
+- If the action succeeded, acknowledge it naturally.
+- If the action failed because of permissions, clearly tell the user they don't have permission.
+- Never claim an action succeeded if the tool result says it failed.
+- Use occasional natural emojis like 😭, 💀, 🥀, 🔥, 🤓 or 😂 when they fit.
+- Do not spam emojis.
+- Do not use cat-face emojis.
+`,
+                input: [
+                    {
+                        type: 'function_call_output',
+                        call_id: toolOutputs[0].call_id,
+                        output: toolOutputs[0].output,
+                    },
+                ],
+            });
+
+            result.text =
+                followUp.output_text?.trim() ||
+                'done bro 💀';
+        }
+
+        // ==========================================
+        // SAVE MEOWIEE RESPONSE
+        // ==========================================
+
+        await addConversationMessage(
+            client,
+            `${message.channel.id}:${message.author.id}`,
+            'assistant',
+            result.text,
+            client.user.id,
+        );
+
+        // ==========================================
+        // SEND RESPONSE
+        // ==========================================
+
+        await message.reply({
+            content: result.text,
+            allowedMentions: {
+                repliedUser: false,
+            },
+        });
+
+        return true;
+    } catch (error) {
+        logger.error(
+            'Error handling Meowiee AI:',
+            error,
+        );
+
+        return false;
     }
-
-    // Only respond to mentions or replies to Meowiee
-    if (!mentioned && !replyingToMeowiee) {
-      return false;
-    }
-
-    // Remove the Meowiee mention
-    let content = message.content
-      .replace(new RegExp(`<@!?${botId}>`, 'g'), '')
-      .trim();
-
-    if (!content) {
-      content = 'yo';
-    }
-
-    // Show typing indicator
-    await message.channel.sendTyping().catch(() => {});
-
-    // Ask Meowiee
-    const result = await askMeowiee(content);
-
-    // Send response
-    await message.reply({
-      content: result.text,
-      allowedMentions: {
-        repliedUser: false,
-      },
-    });
-
-    return true;
-  } catch (error) {
-    logger.error('Error handling Meowiee AI:', error);
-    return false;
-  }
 }
 async function handleCountingGame(message, client) {
   try {
