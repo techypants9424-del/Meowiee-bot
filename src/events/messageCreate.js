@@ -20,12 +20,6 @@ import {
     addConversationMessage,
 } from '../services/ai/aiMemory.js';
 import { aiTools } from '../services/ai/aiTools.js';
-import {
-  getCountingGameConfig,
-  saveCountingGameConfig,
-  isValidCountingMessage,
-  recordCorrectCount,
-} from '../services/countingGameService.js';
 import { getEconomyData, saveEconomyData } from '../utils/economy.js';
 
 const MESSAGE_XP_RATE_LIMIT_ATTEMPTS = 12;
@@ -40,11 +34,6 @@ export default {
 
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
       await handlePingReaction(message);
-
-   const countingProcessed = await handleCountingGame(message, client);
-if (countingProcessed) {
-  return;
-}
 
 await handlePrefixCommand(message, client);
 
