@@ -1,6 +1,10 @@
 import { PermissionFlagsBits } from 'discord.js';
 
 export const aiTools = [
+    // =========================
+    // MUSIC
+    // =========================
+
     {
         type: 'function',
         name: 'play_music',
@@ -30,7 +34,6 @@ export const aiTools = [
         parameters: {
             type: 'object',
             properties: {},
-            required: [],
             additionalProperties: false,
         },
     },
@@ -39,12 +42,11 @@ export const aiTools = [
         type: 'function',
         name: 'skip_music',
         description:
-            'Skip the currently playing song and move to the next song in the queue.',
+            'Skip the currently playing song and move to the next song in the queue. Use when the user asks to skip the current song.',
         strict: true,
         parameters: {
             type: 'object',
             properties: {},
-            required: [],
             additionalProperties: false,
         },
     },
@@ -53,12 +55,11 @@ export const aiTools = [
         type: 'function',
         name: 'leave_voice',
         description:
-            'Leave the current voice channel and stop music playback.',
+            'Leave the current voice channel and stop music playback. Use when the user asks Meowiee to leave, disconnect, or leave voice.',
         strict: true,
         parameters: {
             type: 'object',
             properties: {},
-            required: [],
             additionalProperties: false,
         },
     },
@@ -88,6 +89,10 @@ export const aiTools = [
         },
     },
 
+    // =========================
+    // CHANNELS
+    // =========================
+
     {
         type: 'function',
         name: 'create_channel',
@@ -114,7 +119,10 @@ export const aiTools = [
                         'The type of Discord channel to create.',
                 },
             },
-            required: ['name', 'type'],
+            required: [
+                'name',
+                'type',
+            ],
             additionalProperties: false,
         },
     },
@@ -149,6 +157,32 @@ export const aiTools = [
 
     {
         type: 'function',
+        name: 'delete_channel',
+        description:
+            'Delete a Discord channel. Only users with Manage Channels permission may use this action. Never use unless the user clearly asks to delete a channel.',
+        strict: true,
+        parameters: {
+            type: 'object',
+            properties: {
+                channelName: {
+                    type: 'string',
+                    description:
+                        'The name of the channel that should be deleted.',
+                },
+            },
+            required: [
+                'channelName',
+            ],
+            additionalProperties: false,
+        },
+    },
+
+    // =========================
+    // ROLES
+    // =========================
+
+    {
+        type: 'function',
         name: 'create_role',
         description:
             'Create a new Discord role in the current server. Only users with Manage Roles permission may use this action.',
@@ -177,26 +211,6 @@ export const aiTools = [
 
     {
         type: 'function',
-        name: 'delete_channel',
-        description:
-            'Delete a Discord channel. Only users with Manage Channels permission may use this action. Never use unless the user clearly asks to delete a channel.',
-        strict: true,
-        parameters: {
-            type: 'object',
-            properties: {
-                channelName: {
-                    type: 'string',
-                    description:
-                        'The name of the channel that should be deleted.',
-                },
-            },
-            required: ['channelName'],
-            additionalProperties: false,
-        },
-    },
-
-    {
-        type: 'function',
         name: 'delete_role',
         description:
             'Delete a Discord role. Only users with Manage Roles permission may use this action. Never use unless the user clearly asks to delete a role.',
@@ -210,7 +224,9 @@ export const aiTools = [
                         'The name of the role that should be deleted.',
                 },
             },
-            required: ['roleName'],
+            required: [
+                'roleName',
+            ],
             additionalProperties: false,
         },
     },
@@ -230,23 +246,26 @@ export function hasPermission(
 }
 
 export const AI_TOOL_PERMISSIONS = {
+    // Music
     play_music: null,
     join_voice: null,
     skip_music: null,
     leave_voice: null,
     loop_music: null,
 
+    // Channels
     create_channel:
         PermissionFlagsBits.ManageChannels,
 
     rename_channel:
         PermissionFlagsBits.ManageChannels,
 
-    create_role:
-        PermissionFlagsBits.ManageRoles,
-
     delete_channel:
         PermissionFlagsBits.ManageChannels,
+
+    // Roles
+    create_role:
+        PermissionFlagsBits.ManageRoles,
 
     delete_role:
         PermissionFlagsBits.ManageRoles,
