@@ -100,6 +100,16 @@ async function createAIResponse(input, tools = []) {
             }`,
         );
 
+        if (
+            error?.status === 429 ||
+            error?.statusCode === 429 ||
+            error?.code === 'rate_limit_exceeded'
+        ) {
+            throw new Error(
+                'GROQ_RATE_LIMIT: bro I ran outta brain juice 😭 try again later',
+            );
+        }
+
         throw error;
     }
 }
