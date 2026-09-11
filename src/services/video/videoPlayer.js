@@ -1,6 +1,6 @@
-const { spawn } = require("child_process");
+import { spawn } from 'child_process';
 
-class VideoPlayer {
+export default class VideoPlayer {
     constructor() {
         this.process = null;
     }
@@ -10,15 +10,15 @@ class VideoPlayer {
             this.stop();
         }
 
-        this.process = spawn("ffmpeg", [
-            "-i", input,
-            "-f", "mpegts",
-            "-codec:v", "mpeg1video",
-            "-codec:a", "mp2",
-            "-"
+        this.process = spawn('ffmpeg', [
+            '-i', input,
+            '-f', 'mpegts',
+            '-codec:v', 'mpeg1video',
+            '-codec:a', 'mp2',
+            '-',
         ]);
 
-        this.process.on("close", () => {
+        this.process.on('close', () => {
             this.process = null;
         });
 
@@ -26,9 +26,11 @@ class VideoPlayer {
     }
 
     stop() {
-        if (!this.process) return;
+        if (!this.process) {
+            return;
+        }
 
-        this.process.kill("SIGKILL");
+        this.process.kill('SIGKILL');
         this.process = null;
     }
 
@@ -36,5 +38,3 @@ class VideoPlayer {
         return this.process !== null;
     }
 }
-
-module.exports = VideoPlayer;
