@@ -17,6 +17,20 @@ import { refreshPlayerMessage } from './playerHandler.js';
 const YOUTUBE_URL_PATTERN = /(?:youtube\.com|youtu\.be)/i;
 const PLAYER_CONNECT_TIMEOUT_MS = 12_000;
 
+export function getPlayer(client, guildId) {
+    return client.riffy?.players?.get(guildId);
+}
+
+function assertRiffyAvailable(client) {
+    if (!client.riffy) {
+        throw new TitanBotError(
+            'Music unavailable',
+            ErrorTypes.CONFIGURATION,
+            'The music system is not initialized.',
+        );
+    }
+}
+
 function getConnectedLavalinkNodes(client) {
     if (!client.riffy?.nodeMap) {
         return [];
