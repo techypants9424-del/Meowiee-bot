@@ -15,7 +15,8 @@ class AniKoto {
     }
 
     async getSeries(id) {
-        const url = `${API_BASE}/series/${encodeURIComponent(id)}`;
+        const url =
+            `${API_BASE}/series/${encodeURIComponent(id)}`;
 
         const response = await fetch(url);
 
