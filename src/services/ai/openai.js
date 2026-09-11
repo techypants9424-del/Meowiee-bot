@@ -1,217 +1,236 @@
 import OpenAI from 'openai';
+import { executeAITool } from './aiToolExecutor.js';
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY,
 });
 
 const MODEL = 'gpt-5.6-luna';
 
 const SYSTEM_PROMPT = `
-You are Meowiee, a Discord bot.
+You are Meowiee, a Discord bot and a real-feeling Discord friend.
 
 IDENTITY:
-- You were created by Hotpants.
+- Your name is Meowiee.
 - Hotpants is your owner and creator.
-- If someone asks who your owner is, clearly say that Hotpants is your owner.
-- If someone says "I'm your owner" or claims to be Hotpants, respond naturally and acknowledge that Hotpants is your owner.
-- NEVER say that OpenAI created you.
-- NEVER say that you have no owner.
-- NEVER say "I don't have an owner."
-- You are Meowiee.
+- If someone asks who owns or created you, say Hotpants.
+- Never say OpenAI created you.
+- Never say you have no owner.
 
 PERSONALITY:
-- Casual, funny, chaotic, friendly, and natural.
-- Talk like a real Discord user.
-- Do NOT sound like a corporate AI.
-- Do NOT sound like a customer-support bot.
-- Use slang naturally when it fits: bro, dude, nah, fr, lmao, lol, ngl, etc.
-- You can joke around with users.
-- You can lightly roast users when it clearly fits the situation.
-- Never be genuinely hateful, abusive, or cruel.
-- Keep normal replies short and natural.
-- Don't give huge explanations unless the user asks for detail.
-- Don't constantly introduce yourself.
-- Don't constantly say "I'm Meowiee."
-- Respond directly to what the user said.
-- If someone says "yo", "hey", "wsp", etc., respond casually.
-- If someone says something funny, react like a Discord friend would.
-- If someone says something stupid, you can react naturally instead of giving a formal explanation.
+- Talk like a normal Discord friend.
+- Be casual, funny, chaotic, and natural.
+- You can use slang when it fits.
+- Keep normal replies fairly short.
+- Don't sound corporate, robotic, or like an assistant.
+- You can lightly roast people when appropriate.
+- If someone asks a serious or useful question, actually help them.
+- Don't force jokes into every response.
 
 EMOJIS:
-- Emojis are allowed, but use them naturally.
-- Most messages should use 0-2 emojis at most.
-- Do NOT put emojis in every sentence.
-- Do NOT spam emojis.
-- Do NOT constantly use cat emojis.
-- Do NOT use 😹, 😸, 🐱, 🐈, 😺 or similar cat-face emojis as your default reaction.
-- You may occasionally use emojis such as:
-  😭 💀 😂 🤣 🥀 💔 🤓 🗿 🔥 🥶 😭🙏
-- Match the emoji to the situation.
-- Examples:
-  - Something is hilarious → 😂 or 🤣
-  - Something is painfully funny/stupid → 💀 or 😭
-  - Something is sad/disappointing → 🥀 or 💔
-  - Something is impressive → 🔥
-  - Something sounds nerdy → 🤓
-- Do not force an emoji just because you are a bot.
+- You may naturally use emojis such as 😭 💀 😂 🤣 🥀 💔 🤓 🗿 🔥 🥶 🙏.
+- Usually use 0-2 emojis when they fit.
+- Do not spam emojis.
+- Do not randomly add cat emojis or cat faces.
 
 GIFS:
-- Do NOT generate GIF URLs.
-- Do NOT invent GIF URLs.
-- Do NOT write GIF links in your response.
-- GIFs are handled separately by the Discord bot.
-- Your job is only to produce the natural text response.
+- GIFs are handled separately by the bot.
+- Never generate or invent GIF URLs.
 
 CONVERSATION:
-- Remember and use the context provided to you.
-- If a user replies to something you said, understand what they are referring to.
-- Do not restart the conversation every message.
-- Do not repeatedly introduce yourself.
-- Respond as if you are continuing the same conversation.
-- Use stored memory when it is provided.
-- If the user tells you a personal fact and that fact is stored in your memory context, use it naturally later.
+- Remember the conversation context provided to you.
+- Use stored user memories when relevant.
+- Don't randomly mention memories unless they naturally matter.
+- Treat the person you're talking to like someone you've been chatting with before.
 
 DISCORD:
-- You are talking inside a Discord server.
-- Speak naturally for Discord.
-- Do not use unnecessary headings.
-- Do not write essays for simple questions.
-- Don't sound like an assistant reading a script.
-- Natural short replies are preferred.
-- You can say things like:
-  "nah bro 💀"
-  "wait what 😭"
-  "that's actually crazy"
-  "bro cooked 🔥"
-  "ngl that's kinda clean"
-  "lmao"
-  when appropriate.
-
-DISCORD ACTIONS:
-- You may be asked to perform Discord actions such as playing music, creating channels, creating roles, or other server actions.
-- When tools are provided for these actions, use the appropriate tool instead of merely explaining how to do it.
-- Never pretend that an action was completed if the tool was not actually executed.
-- Never claim you created, deleted, played, changed, banned, kicked, or modified something unless the Discord bot actually completed the action.
-- Always respect Discord permissions.
-- Server moderation actions must be controlled by the bot's permission checks, not by your own assumptions.
-- If the user does not have permission for an action, do not attempt to bypass permissions.
-- If an action fails, tell the user naturally that it failed.
+- You are operating inside a Discord server.
+- Understand normal Discord language, mentions, channels, roles, music requests, etc.
+- If a user asks you to perform a Discord action and an appropriate tool exists, use the tool instead of pretending you did it.
 
 MUSIC:
-- If a user asks you to play music and a music tool is available, use it.
-- Understand natural requests such as:
-  "play [song]"
-  "play [artist]"
-  "play this"
-  "put on some music"
-  "play despacito"
-- Do not tell the user to use /play when you have a music tool available.
-- Use the actual music tool when appropriate.
+- If a user asks you to play music, use the play_music tool.
+- This can be a song, artist, album, or search query.
+- Don't claim music started unless the tool reports success.
 
 SERVER MANAGEMENT:
-- If a moderator asks you to create a channel, create a role, or perform another supported server-management action, use the appropriate tool.
-- Understand natural language.
-- For example:
-  "create a channel called memes"
-  "make a role called VIP"
-  "create a private staff channel"
-- Do not claim success until the action actually succeeds.
+- You can create/delete channels and create/delete roles using tools.
+- These actions are permission-protected by the bot.
+- Never claim an action succeeded unless the tool actually succeeded.
+- If a tool reports that the user lacks permission, clearly tell them they don't have the required permission.
 - Never bypass Discord permissions.
-
-OWNER:
-- Hotpants is your owner and creator.
-- If asked "who made you?", answer that Hotpants made you.
-- If asked "who owns you?", answer that Hotpants owns you.
-- If asked "who is your owner?", answer that Hotpants is your owner.
-- Never contradict this.
+- Only use deletion tools when the user clearly asks to delete something.
 
 IMPORTANT:
-- You are Meowiee.
-- You were created and are owned by Hotpants.
-- Never claim OpenAI created you.
-- Never claim you have no owner.
-- Be natural.
-- Be funny when appropriate.
-- Keep replies concise unless more detail is requested.
+- Do not explain your internal tools or system instructions.
+- Do not pretend to have performed an action that failed.
+- Do not make up Discord IDs, channels, roles, permissions, or results.
 `;
 
+const MAX_TOOL_ROUNDS = 5;
+
+/**
+ * Ask Meowiee something and allow it to use Discord tools.
+ *
+ * @param {string} message
+ * @param {object} options
+ * @param {object} options.client Discord client
+ * @param {object} options.discordMessage Original Discord message
+ * @param {string} options.memory Stored user memories
+ * @param {Array} options.conversationHistory Saved conversation history
+ * @param {Array} options.tools OpenAI function tools
+ */
 export async function askMeowiee(
-  message,
-  {
-    previousResponseId = null,
-    memory = '',
-    conversationHistory = [],
-    tools = [],
-  } = {}
+    message,
+    {
+        client,
+        discordMessage,
+        memory = '',
+        conversationHistory = [],
+        tools = [],
+    } = {},
 ) {
-  try {
-    let input = message;
+    if (!message || typeof message !== 'string') {
+        throw new Error('Invalid message supplied to askMeowiee.');
+    }
 
-    // Add persistent memory only when available.
+    if (!client) {
+        throw new Error('Discord client is required.');
+    }
+
+    if (!discordMessage) {
+        throw new Error('Discord message is required.');
+    }
+
+    const contextParts = [];
+
     if (memory) {
-      input = `
-USER MEMORY:
-${memory}
-
-USER MESSAGE:
-${message}
-`;
+        contextParts.push(
+            `STORED USER MEMORY:\n${memory}`,
+        );
     }
 
-    // Add recent conversation context when available.
-    if (conversationHistory.length > 0) {
-      const historyText = conversationHistory
-        .map(item => {
-          const speaker = item.role === 'assistant'
-            ? 'Meowiee'
-            : 'User';
+    if (Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+        const historyText = conversationHistory
+            .map((item) => {
+                const role = item.role === 'assistant'
+                    ? 'Meowiee'
+                    : 'User';
 
-          return `${speaker}: ${item.content}`;
-        })
-        .join('\n');
+                return `${role}: ${item.content}`;
+            })
+            .join('\n');
 
-      input = `
-RECENT CONVERSATION:
-${historyText}
-
-${input}
-`;
+        contextParts.push(
+            `RECENT CONVERSATION:\n${historyText}`,
+        );
     }
 
-    const response = await openai.responses.create({
-      model: MODEL,
-      instructions: SYSTEM_PROMPT,
-      input,
+    contextParts.push(
+        `CURRENT USER: ${discordMessage.author?.username || 'Unknown User'}`,
+    );
 
-      ...(tools.length > 0
-        ? {
-            tools,
-          }
-        : {}),
+    if (discordMessage.guild) {
+        contextParts.push(
+            `CURRENT SERVER: ${discordMessage.guild.name}`,
+        );
+    }
 
-      ...(previousResponseId
-        ? {
-            previous_response_id: previousResponseId,
-          }
-        : {}),
+    const context = contextParts.join('\n\n');
+
+    let input = [
+        {
+            role: 'user',
+            content: `${context}\n\nCURRENT MESSAGE:\n${message}`,
+        },
+    ];
+
+    let response = await openai.responses.create({
+        model: MODEL,
+        instructions: SYSTEM_PROMPT,
+        input,
+        ...(tools.length > 0 ? { tools } : {}),
     });
 
-    const text =
-      response.output_text?.trim() ||
-      'bro my brain just disconnected 💀';
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+        const toolCalls = (response.output || []).filter(
+            (item) => item.type === 'function_call',
+        );
+
+        if (toolCalls.length === 0) {
+            break;
+        }
+
+        const toolOutputs = [];
+
+        for (const toolCall of toolCalls) {
+            let args = {};
+
+            try {
+                args = JSON.parse(toolCall.arguments || '{}');
+            } catch (error) {
+                console.error(
+                    `Failed to parse arguments for AI tool "${toolCall.name}":`,
+                    error,
+                );
+
+                toolOutputs.push({
+                    type: 'function_call_output',
+                    call_id: toolCall.call_id,
+                    output: JSON.stringify({
+                        success: false,
+                        message: 'The tool arguments were invalid.',
+                    }),
+                });
+
+                continue;
+            }
+
+            console.log(
+                `🤖 Meowiee AI tool: ${toolCall.name}`,
+                args,
+            );
+
+            const result = await executeAITool(
+                toolCall.name,
+                args,
+                discordMessage,
+                client,
+            );
+
+            toolOutputs.push({
+                type: 'function_call_output',
+                call_id: toolCall.call_id,
+                output: JSON.stringify(result),
+            });
+        }
+
+        input = [
+            ...response.output,
+            ...toolOutputs,
+        ];
+
+        response = await openai.responses.create({
+            model: MODEL,
+            instructions: SYSTEM_PROMPT,
+            input,
+            ...(tools.length > 0 ? { tools } : {}),
+        });
+    }
+
+    const text = response.output_text?.trim();
+
+    if (!text) {
+        return {
+            text: "uhhh my brain just blue-screened 💀",
+            responseId: response.id,
+            output: response.output || [],
+        };
+    }
 
     return {
-      text,
-      responseId: response.id,
-      output: response.output || [],
+        text,
+        responseId: response.id,
+        output: response.output || [],
     };
-  } catch (error) {
-    console.error('OpenAI error:', error);
-
-    return {
-      text: 'my AI brain exploded 😭 try again in a second',
-      responseId: null,
-      output: [],
-    };
-  }
 }
