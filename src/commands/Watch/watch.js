@@ -12,28 +12,28 @@ export default {
     data: new SlashCommandBuilder()
         .setName('watch')
         .setDescription('Watch an anime episode from AniKoto')
-        .addIntegerOption((option) =>
+        .addIntegerOption(option =>
             option
                 .setName('id')
                 .setDescription('AniKoto series ID')
                 .setRequired(true)
-                .setMinValue(1),
+                .setMinValue(1)
         )
-        .addIntegerOption((option) =>
+        .addIntegerOption(option =>
             option
                 .setName('episode')
                 .setDescription('Episode number')
                 .setRequired(true)
-                .setMinValue(1),
+                .setMinValue(1)
         )
-        .addStringOption((option) =>
+        .addStringOption(option =>
             option
                 .setName('language')
                 .setDescription('Sub or dub')
                 .addChoices(
                     { name: 'Sub', value: 'sub' },
-                    { name: 'Dub', value: 'dub' },
-                ),
+                    { name: 'Dub', value: 'dub' }
+                )
         ),
 
     async execute(interaction) {
@@ -49,23 +49,20 @@ export default {
             const language =
                 interaction.options.getString('language') || 'sub';
 
-            // Get anime information
             const series = await anikoto.getSeries(id);
 
-            // Get requested episode
             const episode = await anikoto.getEpisode(
                 id,
                 episodeNumber,
-                language,
+                language
             );
 
             const title =
                 series.title ||
                 series.name ||
                 series.anime?.title ||
-                `AniKoto #${id}`;
+                `AniKoto Series ${id}`;
 
-            // Create watch session
             const session = new VideoSession(interaction.guildId);
 
             session.start({
@@ -81,7 +78,7 @@ export default {
                 .setDescription(
                     `**Episode:** ${episode.number}\n` +
                     `**Language:** ${language.toUpperCase()}\n\n` +
-                    `🔗 [Open Episode](${episode.embedUrl})`,
+                    `🔗 [Watch Episode](${episode.embedUrl})`
                 )
                 .setFooter({
                     text: 'Meowiee • AniKoto',
@@ -90,13 +87,13 @@ export default {
             await InteractionHelper.safeEditReply(interaction, {
                 embeds: [embed],
             });
+
         } catch (error) {
             console.error('[WATCH]', error);
 
             await InteractionHelper.safeEditReply(interaction, {
                 content:
-                    `❌ Could not load the AniKoto episode.\n` +
-                    `\`${error.message}\``,
+                    `❌ AniKoto error:\n\`${error.message}\``,
             });
         }
     },
