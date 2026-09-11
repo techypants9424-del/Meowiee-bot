@@ -24,7 +24,6 @@ import { getEconomyData, saveEconomyData } from '../utils/economy.js';
 
 const MESSAGE_XP_RATE_LIMIT_ATTEMPTS = 12;
 const MESSAGE_XP_RATE_LIMIT_WINDOW_MS = 10000;
-const aiResponseIds = new Map();
 
 
 export default {
@@ -444,15 +443,14 @@ async function handleMeowieeAI(message, client) {
   try {
     const botId = client.user.id;
 
-    // Check if this message mentions Meowiee
+    // Check if Meowiee was mentioned
     const mentioned = message.mentions.users.has(botId);
 
-    // Check if this message is a reply to Meowiee
+    // Check if this is a reply to Meowiee
     let replyingToMeowiee = false;
-    let referencedMessage = null;
 
     if (message.reference?.messageId) {
-      referencedMessage = await message.channel.messages
+      const referencedMessage = await message.channel.messages
         .fetch(message.reference.messageId)
         .catch(() => null);
 
@@ -461,12 +459,12 @@ async function handleMeowieeAI(message, client) {
       }
     }
 
-    // Ignore messages that aren't mentions or replies to Meowiee
+    // Only respond to mentions or replies to Meowiee
     if (!mentioned && !replyingToMeowiee) {
       return false;
     }
 
-    // Remove the @Meowiee mention from the message
+    // Remove the Meowiee mention
     let content = message.content
       .replace(new RegExp(`<@!?${botId}>`, 'g'), '')
       .trim();
@@ -475,28 +473,19 @@ async function handleMeowieeAI(message, client) {
       content = 'yo';
     }
 
-    // Show Discord's thinking indicator
+    // Show typing indicator
     await message.channel.sendTyping().catch(() => {});
 
-    // Continue conversation if replying to an AI message
-   const previousResponseId = referencedMessage
-  ? aiResponseIds.get(referencedMessage.id) || null
-  : null;
+    // Ask Meowiee
+    const result = await askMeowiee(content);
 
-    const result = await askMeowiee(content, previousResponseId);
-
-    const reply = await message.reply({
+    // Send response
+    await message.reply({
       content: result.text,
       allowedMentions: {
         repliedUser: false,
       },
     });
-
-    // Store the OpenAI response ID in the message footer
-    if (result.responseId) {
-      // We can't edit normal text with metadata, so save it in memory below.
-      aiResponseIds.set(reply.id, result.responseId);
-    }
 
     return true;
   } catch (error) {
