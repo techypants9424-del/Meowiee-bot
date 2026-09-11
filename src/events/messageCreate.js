@@ -508,13 +508,13 @@ async function handleMeowieeAI(message, client) {
 
         // Ask Meowiee
         // openai.js handles AI tools internally.
-        const result = await askMeowiee(content, {
-            client,
-            discordMessage: message,
-            memory,
-            conversationHistory,
-            tools: aiTools,
-        });
+       const result = await askMeowiee(content, {
+    client,
+    discordMessage: message,
+    memory,
+    conversationHistory: [],
+    tools: aiTools,
+});
 
         // Save Meowiee's response
         await addConversationMessage(
