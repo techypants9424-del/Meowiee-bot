@@ -31,6 +31,10 @@ class VideoPlayer {
         this.process.kill("SIGKILL");
         this.process = null;
     }
+
+    isPlaying() {
+        return this.process !== null;
+    }
 }
 
 module.exports = VideoPlayer;
