@@ -22,6 +22,7 @@ export const CATEGORY_ICONS = {
   Utility: '🔧',
   Verification: '✅',
   Welcome: '👋',
+  Watch: '📺',
 };
 
 /** Commands that always stay available so admins can recover access. */
