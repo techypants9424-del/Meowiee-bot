@@ -2,17 +2,13 @@ import OpenAI from 'openai';
 import { executeAITool } from './aiToolExecutor.js';
 
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-
-    // Give OpenAI enough time for slower requests,
-    // but never let one request hang forever.
+    apiKey: process.env.GROQ_API_KEY,
+    baseURL: 'https://api.groq.com/openai/v1',
     timeout: 20000,
-
-    // Prevent automatic retries from making responses slower.
     maxRetries: 0,
 });
 
-const MODEL = 'gpt-5.6-luna';
+const MODEL = 'openai/gpt-oss-120b';
 const MAX_TOOL_ROUNDS = 3;
 
 const SYSTEM_PROMPT = `
@@ -55,8 +51,8 @@ SERVER MANAGEMENT:
 - Creating/deleting channels requires Manage Channels.
 - Creating/deleting roles requires Manage Roles.
 - Discord permissions are enforced by the bot.
-- Never bypass permissions.
-- Never claim an action succeeded if the tool failed.
+- Never bypass Discord permissions.
+- Never claim an action succeeded if it failed.
 - Never delete anything unless the user clearly asks.
 
 CONVERSATION:
@@ -75,7 +71,7 @@ IMPORTANT:
 async function createAIResponse(input, tools = []) {
     const started = Date.now();
 
-    console.log('[AI] Sending request to OpenAI...');
+    console.log('[AI] Sending request to Groq...');
 
     try {
         const response = await openai.responses.create({
@@ -89,13 +85,13 @@ async function createAIResponse(input, tools = []) {
         });
 
         console.log(
-            `[AI] OpenAI responded in ${Date.now() - started}ms`,
+            `[AI] Groq responded in ${Date.now() - started}ms`,
         );
 
         return response;
     } catch (error) {
         console.error(
-            `[AI] OpenAI failed after ${Date.now() - started}ms`,
+            `[AI] Groq failed after ${Date.now() - started}ms`,
         );
 
         console.error(
@@ -131,7 +127,7 @@ export async function askMeowiee(
     }
 
     /*
-     * Keep the request small and fast.
+     * Keep only recent history so requests stay small.
      */
     const history = Array.isArray(conversationHistory)
         ? conversationHistory.slice(-6)
@@ -189,7 +185,7 @@ export async function askMeowiee(
     ];
 
     /*
-     * First request.
+     * First AI request.
      */
     let response = await createAIResponse(
         input,
@@ -197,7 +193,7 @@ export async function askMeowiee(
     );
 
     /*
-     * Handle tool calls.
+     * Handle function/tool calls.
      */
     for (
         let round = 0;
@@ -212,7 +208,7 @@ export async function askMeowiee(
         );
 
         /*
-         * No tool call = normal response.
+         * Normal response — no tools needed.
          */
         if (!toolCalls.length) {
             break;
@@ -235,7 +231,7 @@ export async function askMeowiee(
                 );
             } catch (error) {
                 console.error(
-                    `[AI] Failed to parse tool arguments for ${toolCall.name}:`,
+                    `[AI] Failed to parse ${toolCall.name} arguments:`,
                     error,
                 );
 
@@ -295,7 +291,7 @@ export async function askMeowiee(
         }
 
         /*
-         * Send tool results back to OpenAI.
+         * Send tool results back to Groq.
          */
         response = await createAIResponse(
             [
@@ -306,14 +302,12 @@ export async function askMeowiee(
         );
     }
 
-    /*
-     * Get final text.
-     */
-    const text = response.output_text?.trim();
+    const text =
+        response.output_text?.trim();
 
     if (!text) {
         throw new Error(
-            'OpenAI returned no text.',
+            'Groq returned no text.',
         );
     }
 
