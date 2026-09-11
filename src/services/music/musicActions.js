@@ -86,22 +86,31 @@ async function waitForPlayerConnection(player) {
 }
 
 async function startPlayback(player) {
-    await waitForPlayerConnection(player);
-    await player.play();
-}
-
-export function getPlayer(client, guildId) {
-    return client.riffy?.players?.get(guildId) || null;
-}
-
-export function assertRiffyAvailable(client) {
-    if (!client.riffy) {
+    if (!player) {
         throw new TitanBotError(
-            'Lavalink not configured',
+            'Player unavailable',
             ErrorTypes.CONFIGURATION,
-            'Music is unavailable — Lavalink is not configured.',
+            'Music player is unavailable.',
         );
     }
+
+    if (!player.connected) {
+        try {
+            await player.connection?.resolve?.();
+        } catch {
+            // Riffy may establish the connection asynchronously.
+        }
+    }
+
+    if (!player.connected) {
+        throw new TitanBotError(
+            'Voice connection failed',
+            ErrorTypes.CONFIGURATION,
+            'I could not connect to the voice channel. Please try again.',
+        );
+    }
+
+    await player.play();
 }
 
 export function assertInVoice(member) {
