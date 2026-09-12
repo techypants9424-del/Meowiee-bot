@@ -13,7 +13,6 @@ class WatchSessionManager {
         language = 'sub',
         watchUrl = null,
     }) {
-        // One active room per Discord server
         const existing = this.getByGuild(guildId);
 
         if (existing) {
@@ -26,17 +25,14 @@ class WatchSessionManager {
             roomId,
             guildId,
             hostId,
-
             title,
             episode,
             language,
-
             watchUrl,
 
             playing: false,
             position: 0,
             updatedAt: Date.now(),
-
             createdAt: Date.now(),
         };
 
@@ -67,7 +63,6 @@ class WatchSessionManager {
         }
 
         Object.assign(session, changes);
-
         session.updatedAt = Date.now();
 
         return session;
