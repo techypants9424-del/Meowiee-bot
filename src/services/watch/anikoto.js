@@ -1,221 +1,115 @@
-const ANIKOTO_API = 'https://anikotoapi.site';
-const ANIKOTO_SITE = 'https://anikototv.to';
+const ANIKOTO_API = 'https://anikoto-api.onrender.com';
 
 async function fetchJson(url) {
     const response = await fetch(url, {
         headers: {
             Accept: 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Meowiee Watch Party)',
+            'User-Agent': 'Meowiee-Watch-Party',
         },
     });
 
     if (!response.ok) {
         throw new Error(
-            `Request failed: ${response.status} ${response.statusText}`
+            `AniKoto API returned ${response.status} ${response.statusText}`
         );
     }
 
-    return response.json();
-}
+    const text = await response.text();
 
-async function fetchText(url) {
-    const response = await fetch(url, {
-        headers: {
-            Accept: 'text/html,application/xhtml+xml',
-            'User-Agent': 'Mozilla/5.0 (Meowiee Watch Party)',
-        },
-    });
-
-    if (!response.ok) {
-        throw new Error(
-            `AniKoto website returned ${response.status}`
-        );
+    if (!text.trim()) {
+        return null;
     }
 
-    return response.text();
+    try {
+        return JSON.parse(text);
+    } catch {
+        throw new Error('AniKoto API returned invalid JSON');
+    }
 }
 
-export async function getSeries(seriesId) {
+/**
+ * Get anime information from AniKoto.
+ *
+ * Example:
+ * /info?name=naruto-shippuden-c8gov
+ */
+export async function getAnimeInfo(slug) {
     const data = await fetchJson(
-        `${ANIKOTO_API}/series/${encodeURIComponent(seriesId)}`
+        `${ANIKOTO_API}/info?name=${encodeURIComponent(slug)}`
     );
 
-    if (
-        !data?.ok ||
-        !data.data?.anime ||
-        !Array.isArray(data.data.episodes)
-    ) {
-        throw new Error('Invalid AniKoto series response');
+    if (!data) {
+        return null;
     }
 
-    return data.data;
-}
-
-function decodeHtml(value) {
-    return String(value || '')
-        .replace(/&amp;/g, '&')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>');
-}
-
-function stripHtml(value) {
-    return decodeHtml(
-        String(value || '')
-            .replace(/<[^>]*>/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim()
-    );
+    return data;
 }
 
 /**
- * Search AniKoto's website.
+ * Convert anime slug -> AniKoto numeric ID.
  *
- * AniKoto's public API does not currently document a search endpoint,
- * so this uses the site's search page and extracts the result links.
+ * The API documents /page?name=..., but the live endpoint
+ * currently returns an empty body.
  */
-export async function searchAnime(query) {
-    const cleanQuery = String(query || '').trim();
+export async function getAnimeId(slug) {
+    const data = await fetchJson(
+        `${ANIKOTO_API}/page?name=${encodeURIComponent(slug)}`
+    );
 
-    if (!cleanQuery) {
-        return [];
+    if (!data) {
+        return null;
     }
 
-    const url =
-        `${ANIKOTO_SITE}/search?keyword=` +
-        encodeURIComponent(cleanQuery);
-
-    const html = await fetchText(url);
-
-    const results = [];
-    const seen = new Set();
-
-    /*
-     * Look for AniKoto anime links.
-     *
-     * Example:
-     * /anime/naruto-shippuden-c8gov
-     */
-    const linkRegex =
-        /href=["'](?:https?:\/\/[^"']+)?\/(?:anime|watch)\/([^"'?#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
-
-    let match;
-
-    while ((match = linkRegex.exec(html)) !== null) {
-        const slug = decodeHtml(match[1]);
-        const rawText = match[2];
-
-        const title = stripHtml(rawText);
-
-        if (!slug || !title) {
-            continue;
-        }
-
-        const key = slug.toLowerCase();
-
-        if (seen.has(key)) {
-            continue;
-        }
-
-        seen.add(key);
-
-        results.push({
-            title,
-            slug,
-        });
+    if (typeof data === 'number') {
+        return data;
     }
 
-    /*
-     * Fallback: search for common data attributes if the page
-     * uses a different HTML structure.
-     */
-    if (!results.length) {
-        const slugRegex =
-            /(?:data-slug|data-anime-slug)=["']([^"']+)["']/gi;
-
-        while ((match = slugRegex.exec(html)) !== null) {
-            const slug = decodeHtml(match[1]);
-
-            if (!slug || seen.has(slug.toLowerCase())) {
-                continue;
-            }
-
-            seen.add(slug.toLowerCase());
-
-            results.push({
-                title: slug.replace(/-/g, ' '),
-                slug,
-            });
-        }
+    if (typeof data === 'string' && /^\d+$/.test(data)) {
+        return Number(data);
     }
 
-    /*
-     * Rank results.
-     */
-    const normalizedQuery = cleanQuery.toLowerCase();
+    const possibleId =
+        data.id ??
+        data.anime_id ??
+        data.animeId ??
+        data.malid ??
+        data.data?.id ??
+        data.data?.anime_id ??
+        data.data?.animeId ??
+        data.data?.malid;
 
-    results.sort((a, b) => {
-        const aTitle = a.title.toLowerCase();
-        const bTitle = b.title.toLowerCase();
-
-        const aExact = aTitle === normalizedQuery ? 100 : 0;
-        const bExact = bTitle === normalizedQuery ? 100 : 0;
-
-        const aStarts = aTitle.startsWith(normalizedQuery) ? 50 : 0;
-        const bStarts = bTitle.startsWith(normalizedQuery) ? 50 : 0;
-
-        const aContains = aTitle.includes(normalizedQuery) ? 20 : 0;
-        const bContains = bTitle.includes(normalizedQuery) ? 20 : 0;
-
-        return (
-            bExact +
-            bStarts +
-            bContains -
-            (aExact + aStarts + aContains)
-        );
-    });
-
-    return results.slice(0, 10);
-}
-
-/**
- * Try to resolve an AniKoto website slug into an AniKoto API ID.
- *
- * The official API uses numeric series IDs, while the website
- * search returns slugs.
- */
-async function resolveSeriesIdFromSlug(slug) {
-    /*
-     * First try the website page.
-     */
-    const url =
-        `${ANIKOTO_SITE}/anime/${encodeURIComponent(slug)}`;
-
-    const html = await fetchText(url);
-
-    /*
-     * Look for numeric AniKoto IDs in common attributes.
-     */
-    const patterns = [
-        /data-id=["'](\d+)["']/i,
-        /data-anime-id=["'](\d+)["']/i,
-        /anime[_-]?id["']?\s*[:=]\s*["'](\d+)["']/i,
-        /"id"\s*:\s*(\d+)/i,
-    ];
-
-    for (const pattern of patterns) {
-        const match = html.match(pattern);
-
-        if (match?.[1]) {
-            return Number(match[1]);
-        }
+    if (possibleId && /^\d+$/.test(String(possibleId))) {
+        return Number(possibleId);
     }
 
     return null;
 }
 
-export function findEpisode(series, episodeNumber) {
+/**
+ * Get all episodes using AniKoto's numeric anime ID.
+ *
+ * /episodes?id=10
+ */
+export async function getEpisodes(animeId) {
+    if (!animeId) {
+        return [];
+    }
+
+    const data = await fetchJson(
+        `${ANIKOTO_API}/episodes?id=${encodeURIComponent(animeId)}`
+    );
+
+    if (!Array.isArray(data)) {
+        return [];
+    }
+
+    return data;
+}
+
+/**
+ * Find an episode by number.
+ */
+export function findEpisode(episodes, episodeNumber) {
     const number = Number(episodeNumber);
 
     if (!Number.isInteger(number) || number < 1) {
@@ -223,49 +117,107 @@ export function findEpisode(series, episodeNumber) {
     }
 
     return (
-        series.episodes.find(
-            (episode) => Number(episode.number) === number
+        episodes.find(
+            (episode) => Number(episode.num) === number
         ) || null
     );
 }
 
+/**
+ * Resolve an anime + episode.
+ *
+ * Returns the AniKoto episode information.
+ */
 export async function resolveWatchEpisode(
     animeQuery,
-    episodeNumber = 1,
-    language = 'sub'
+    episodeNumber = 1
 ) {
-    const results = await searchAnime(animeQuery);
+    const query = String(animeQuery || '').trim();
 
-    if (!results.length) {
+    if (!query) {
         return {
             ok: false,
             reason: 'anime_not_found',
-            results: [],
         };
     }
-
-    const selected = results[0];
 
     /*
-     * Try to get the numeric ID from the AniKoto website.
+     * If the user gives us a slug directly, use it.
+     *
+     * Example:
+     * naruto-shippuden-c8gov
      */
-    const seriesId = await resolveSeriesIdFromSlug(
-        selected.slug
-    );
+    let slug = query
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '');
 
-    if (!seriesId) {
+    /*
+     * Try the info endpoint first.
+     *
+     * This confirms whether the slug actually exists.
+     */
+    let anime = await getAnimeInfo(slug);
+
+    /*
+     * If the input isn't already a valid slug, try some
+     * common slug forms.
+     */
+    if (!anime) {
+        const simplified = query
+            .toLowerCase()
+            .trim()
+            .replace(/[^a-z0-9\s-]/g, '')
+            .replace(/\s+/g, '-');
+
+        if (simplified !== slug) {
+            slug = simplified;
+            anime = await getAnimeInfo(slug);
+        }
+    }
+
+    if (!anime) {
         return {
             ok: false,
-            reason: 'series_id_not_found',
-            results,
-            selected,
+            reason: 'anime_not_found',
+            slug,
         };
     }
 
-    const series = await getSeries(seriesId);
+    /*
+     * Get numeric ID from /page.
+     *
+     * The current live API appears to return an empty response
+     * here, so this may currently return null.
+     */
+    const animeId = await getAnimeId(slug);
+
+    if (!animeId) {
+        return {
+            ok: false,
+            reason: 'anime_id_not_found',
+            anime,
+            slug,
+        };
+    }
+
+    /*
+     * Get episode list.
+     */
+    const episodes = await getEpisodes(animeId);
+
+    if (!episodes.length) {
+        return {
+            ok: false,
+            reason: 'episodes_not_found',
+            anime,
+            animeId,
+            slug,
+        };
+    }
 
     const episode = findEpisode(
-        series,
+        episodes,
         episodeNumber
     );
 
@@ -273,49 +225,28 @@ export async function resolveWatchEpisode(
         return {
             ok: false,
             reason: 'episode_not_found',
-            anime: series.anime,
-            series,
-            results,
-        };
-    }
-
-    const embedUrl =
-        episode.embed_url?.[language] ||
-        episode.embed_url?.sub ||
-        episode.embed_url?.dub ||
-        null;
-
-    if (!embedUrl) {
-        return {
-            ok: false,
-            reason: 'embed_not_found',
-            anime: series.anime,
-            series,
-            episode,
-            results,
+            anime,
+            animeId,
+            episodes,
+            slug,
         };
     }
 
     return {
         ok: true,
-
-        anime: series.anime,
-
+        anime,
+        animeId,
+        slug,
         episode,
-
-        episodeNumber: episode.number,
-
-        language,
-
-        embedUrl,
-
-        searchResults: results,
+        episodeNumber: Number(episode.num),
+        episodes,
     };
 }
 
 export default {
-    getSeries,
-    searchAnime,
+    getAnimeInfo,
+    getAnimeId,
+    getEpisodes,
     findEpisode,
     resolveWatchEpisode,
 };
