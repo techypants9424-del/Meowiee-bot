@@ -1,5 +1,6 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { watchSessions } from '../../services/watch/watchSessionManager.js';
+import { resolveWatchEpisode } from '../../services/watch/anikoto.js';
 
 export default {
     category: 'Fun',
@@ -22,40 +23,94 @@ export default {
         ),
 
     async execute(interaction, config, client) {
-        const anime = interaction.options.getString('anime');
-        const episode = interaction.options.getInteger('episode') ?? 1;
+        const animeQuery =
+            interaction.options.getString('anime');
 
-        const session = watchSessions.create({
-            guildId: interaction.guildId,
-            hostId: interaction.user.id,
-            title: anime,
-            episode,
-            language: 'sub',
-        });
+        const episode =
+            interaction.options.getInteger('episode') ?? 1;
 
-        const port =
-            client.config?.api?.port ||
-            process.env.PORT ||
-            3000;
+        await interaction.deferReply();
 
-        const baseUrl =
-            process.env.WATCH_BASE_URL ||
-            `http://localhost:${port}`;
+        try {
+            const resolved = await resolveWatchEpisode(
+                animeQuery,
+                episode,
+                'sub'
+            );
 
-        const watchUrl = `${baseUrl}/watch/${session.roomId}`;
+            if (!resolved.ok) {
+                if (resolved.reason === 'anime_not_found') {
+                    await interaction.editReply(
+                        `❌ I couldn't find **${animeQuery}** in the AniKoto catalog.`
+                    );
+                    return;
+                }
 
-        watchSessions.update(session.roomId, {
-            watchUrl,
-        });
+                if (resolved.reason === 'episode_not_found') {
+                    await interaction.editReply(
+                        `❌ **${animeQuery}** doesn't have episode **${episode}** available on AniKoto.`
+                    );
+                    return;
+                }
 
-        await interaction.reply({
-            content:
+                await interaction.editReply(
+                    `❌ I found **${animeQuery}**, but couldn't get a playable embed for episode **${episode}**.`
+                );
+                return;
+            }
+
+            const session = watchSessions.create({
+                guildId: interaction.guildId,
+                hostId: interaction.user.id,
+
+                title:
+                    resolved.anime.title ||
+                    animeQuery,
+
+                episode: resolved.episodeNumber,
+
+                language: resolved.language,
+
+                watchUrl: resolved.embedUrl,
+            });
+
+            const port =
+                client.config?.api?.port ||
+                process.env.PORT ||
+                3000;
+
+            const baseUrl =
+                process.env.WATCH_BASE_URL ||
+                `http://localhost:${port}`;
+
+            const watchUrl =
+                `${baseUrl}/watch/${session.roomId}`;
+
+            watchSessions.update(session.roomId, {
+                watchUrl,
+                embedUrl: resolved.embedUrl,
+
+                animeId: resolved.anime.id,
+                episodeEmbedId:
+                    resolved.episode.episode_embed_id,
+            });
+
+            await interaction.editReply(
                 `🎬 **Watch party created!**\n\n` +
-                `**Anime:** ${anime}\n` +
-                `**Episode:** ${episode}\n` +
-                `**Room:** \`${session.roomId}\`\n\n` +
-                `🔗 ${watchUrl}\n\n` +
-                `The player will be connected next.`,
-        });
+                `**Anime:** ${resolved.anime.title}\n` +
+                `**Episode:** ${resolved.episodeNumber}\n` +
+                `**Language:** ${resolved.language.toUpperCase()}\n\n` +
+                `🔗 ${watchUrl}`
+            );
+        } catch (error) {
+            console.error(
+                '[Watch] Failed to create watch party:',
+                error
+            );
+
+            await interaction.editReply(
+                `❌ Something went wrong while finding **${animeQuery}**.`
+            );
+        }
     },
 };
