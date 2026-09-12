@@ -13,6 +13,13 @@ class WatchSessionManager {
         language = 'sub',
         watchUrl = null,
     }) {
+        // One active room per Discord server
+        const existing = this.getByGuild(guildId);
+
+        if (existing) {
+            this.stop(existing.roomId);
+        }
+
         const roomId = crypto.randomBytes(6).toString('base64url');
 
         const session = {
