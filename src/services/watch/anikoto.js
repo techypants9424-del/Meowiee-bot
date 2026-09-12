@@ -1,3 +1,4 @@
+```js
 const ANIKOTO_API = 'https://anikoto-api.onrender.com';
 
 async function fetchJson(url) {
@@ -8,13 +9,13 @@ async function fetchJson(url) {
         },
     });
 
+    const text = await response.text();
+
     if (!response.ok) {
         throw new Error(
-            `AniKoto API returned ${response.status} ${response.statusText}`
+            `AniKoto API returned ${response.status} ${response.statusText} for ${url}`
         );
     }
-
-    const text = await response.text();
 
     if (!text.trim()) {
         return null;
@@ -23,35 +24,37 @@ async function fetchJson(url) {
     try {
         return JSON.parse(text);
     } catch {
-        throw new Error('AniKoto API returned invalid JSON');
+        throw new Error(`AniKoto returned invalid JSON for ${url}`);
     }
 }
 
 /**
- * Get anime information from AniKoto.
+ * Get anime information.
  *
  * Example:
  * /info?name=naruto-shippuden-c8gov
  */
 export async function getAnimeInfo(slug) {
-    const data = await fetchJson(
-        `${ANIKOTO_API}/info?name=${encodeURIComponent(slug)}`
-    );
-
-    if (!data) {
+    if (!slug) {
         return null;
     }
 
-    return data;
+    return fetchJson(
+        `${ANIKOTO_API}/info?name=${encodeURIComponent(slug)}`
+    );
 }
 
 /**
- * Convert anime slug -> AniKoto numeric ID.
+ * Get numeric AniKoto anime ID.
  *
- * The API documents /page?name=..., but the live endpoint
- * currently returns an empty body.
+ * The documented /page endpoint currently returns an empty
+ * response on the live API, so this is kept defensive.
  */
 export async function getAnimeId(slug) {
+    if (!slug) {
+        return null;
+    }
+
     const data = await fetchJson(
         `${ANIKOTO_API}/page?name=${encodeURIComponent(slug)}`
     );
@@ -68,7 +71,7 @@ export async function getAnimeId(slug) {
         return Number(data);
     }
 
-    const possibleId =
+    const id =
         data.id ??
         data.anime_id ??
         data.animeId ??
@@ -78,17 +81,17 @@ export async function getAnimeId(slug) {
         data.data?.animeId ??
         data.data?.malid;
 
-    if (possibleId && /^\d+$/.test(String(possibleId))) {
-        return Number(possibleId);
+    if (id && /^\d+$/.test(String(id))) {
+        return Number(id);
     }
 
     return null;
 }
 
 /**
- * Get all episodes using AniKoto's numeric anime ID.
+ * Get episode list.
  *
- * /episodes?id=10
+ * /episodes?id=<numeric id>
  */
 export async function getEpisodes(animeId) {
     if (!animeId) {
@@ -99,16 +102,9 @@ export async function getEpisodes(animeId) {
         `${ANIKOTO_API}/episodes?id=${encodeURIComponent(animeId)}`
     );
 
-    if (!Array.isArray(data)) {
-        return [];
-    }
-
-    return data;
+    return Array.isArray(data) ? data : [];
 }
 
-/**
- * Find an episode by number.
- */
 export function findEpisode(episodes, episodeNumber) {
     const number = Number(episodeNumber);
 
@@ -118,19 +114,63 @@ export function findEpisode(episodes, episodeNumber) {
 
     return (
         episodes.find(
-            (episode) => Number(episode.num) === number
+            episode => Number(episode.num) === number
         ) || null
     );
 }
 
 /**
- * Resolve an anime + episode.
+ * Turn:
  *
- * Returns the AniKoto episode information.
+ * Naruto Shippuden
+ *
+ * into:
+ *
+ * naruto-shippuden
+ */
+function normalizeSlug(value) {
+    return String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/['’]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
+/**
+ * Try an AniKoto slug.
+ *
+ * IMPORTANT:
+ * We do NOT throw on a 404 here.
+ * A 404 simply means this guessed slug doesn't exist.
+ */
+async function tryInfo(slug) {
+    try {
+        return await getAnimeInfo(slug);
+    } catch (error) {
+        if (String(error.message).includes('404')) {
+            return null;
+        }
+
+        throw error;
+    }
+}
+
+/**
+ * Resolve anime + episode.
+ *
+ * This accepts either:
+ *
+ * naruto-shippuden-c8gov
+ *
+ * or:
+ *
+ * Naruto Shippuden
  */
 export async function resolveWatchEpisode(
     animeQuery,
-    episodeNumber = 1
+    episodeNumber = 1,
+    language = 'sub'
 ) {
     const query = String(animeQuery || '').trim();
 
@@ -141,58 +181,55 @@ export async function resolveWatchEpisode(
         };
     }
 
+    console.log(
+        `[Watch] Resolving anime query: "${query}"`
+    );
+
     /*
-     * If the user gives us a slug directly, use it.
+     * First assume the user supplied an AniKoto slug.
+     */
+    let slug = normalizeSlug(query);
+
+    let anime = await tryInfo(slug);
+
+    /*
+     * If that failed, we currently don't have a search endpoint
+     * from the documented API.
      *
-     * Example:
-     * naruto-shippuden-c8gov
+     * HOWEVER, some AniKoto queries may already contain the
+     * actual slug, so try the original value as-is too.
      */
-    let slug = query
-        .toLowerCase()
-        .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9-]/g, '');
-
-    /*
-     * Try the info endpoint first.
-     *
-     * This confirms whether the slug actually exists.
-     */
-    let anime = await getAnimeInfo(slug);
-
-    /*
-     * If the input isn't already a valid slug, try some
-     * common slug forms.
-     */
-    if (!anime) {
-        const simplified = query
-            .toLowerCase()
-            .trim()
-            .replace(/[^a-z0-9\s-]/g, '')
-            .replace(/\s+/g, '-');
-
-        if (simplified !== slug) {
-            slug = simplified;
-            anime = await getAnimeInfo(slug);
-        }
+    if (!anime && query !== slug) {
+        anime = await tryInfo(query);
     }
 
     if (!anime) {
+        console.log(
+            `[Watch] Could not resolve "${query}" through AniKoto /info`
+        );
+
         return {
             ok: false,
             reason: 'anime_not_found',
-            slug,
+            query,
         };
     }
 
+    console.log(
+        `[Watch] Found anime: ${anime.title}`
+    );
+
     /*
-     * Get numeric ID from /page.
-     *
-     * The current live API appears to return an empty response
-     * here, so this may currently return null.
+     * The API docs say /page converts the slug into
+     * the numeric ID required by /episodes.
      */
     const animeId = await getAnimeId(slug);
 
     if (!animeId) {
+        console.log(
+            `[Watch] /page returned no numeric ID for "${slug}"`
+        );
+
         return {
             ok: false,
             reason: 'anime_id_not_found',
@@ -201,9 +238,10 @@ export async function resolveWatchEpisode(
         };
     }
 
-    /*
-     * Get episode list.
-     */
+    console.log(
+        `[Watch] AniKoto numeric ID: ${animeId}`
+    );
+
     const episodes = await getEpisodes(animeId);
 
     if (!episodes.length) {
@@ -232,6 +270,23 @@ export async function resolveWatchEpisode(
         };
     }
 
+    /*
+     * IMPORTANT:
+     *
+     * /episodes currently gives us metadata such as:
+     *
+     * num
+     * malid
+     * title
+     * data_id
+     * slug
+     * timestamp
+     *
+     * It does NOT give us an embed URL.
+     *
+     * So we return the raw episode data for the next
+     * watch-player resolution step.
+     */
     return {
         ok: true,
         anime,
@@ -239,6 +294,7 @@ export async function resolveWatchEpisode(
         slug,
         episode,
         episodeNumber: Number(episode.num),
+        language,
         episodes,
     };
 }
@@ -250,3 +306,4 @@ export default {
     findEpisode,
     resolveWatchEpisode,
 };
+```
