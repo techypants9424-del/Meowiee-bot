@@ -3,7 +3,7 @@ import { Client, Collection, GatewayIntentBits } from 'discord.js';
 import { REST } from '@discordjs/rest';
 import express from 'express';
 import cron from 'node-cron';
-
+import { watchSessions } from './services/watch/watchSessionManager.js';
 import config from './config/application.js';
 import { initializeDatabase } from './utils/database.js';
 import { getGuildConfig } from './services/config/guildConfig.js';
@@ -17,6 +17,14 @@ import { initializeMusic } from './services/music/riffySetup.js';
 import { shutdownMusic } from './services/music/playerHandler.js';
 import pkg from '../package.json' with { type: 'json' };
 import { EXPECTED_SCHEMA_VERSION, EXPECTED_SCHEMA_LABEL } from './config/database/schemaVersion.js';
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
 
 class TitanBot extends Client {
   constructor() {
@@ -155,6 +163,107 @@ class TitanBot extends Client {
       requestCounts.set(ip, times);
       next();
     });
+    app.get('/watch/:roomId', (req, res) => {
+    const session = watchSessions.get(req.params.roomId);
+
+    if (!session) {
+        return res.status(404).send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Watch Party Not Found</title>
+            </head>
+            <body>
+                <h1>404</h1>
+                <p>This Meowiee watch party doesn't exist.</p>
+            </body>
+            </html>
+        `);
+    }
+
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta
+                name="viewport"
+                content="width=device-width, initial-scale=1.0"
+            >
+            <title>${escapeHtml(session.title)} — Meowiee Watch Party</title>
+
+            <style>
+                body {
+                    margin: 0;
+                    background: #080808;
+                    color: white;
+                    font-family: Arial, sans-serif;
+                }
+
+                .container {
+                    max-width: 1200px;
+                    margin: 40px auto;
+                    padding: 20px;
+                }
+
+                h1 {
+                    margin-bottom: 5px;
+                }
+
+                .episode {
+                    color: #aaa;
+                    margin-bottom: 25px;
+                }
+
+                .player {
+                    width: 100%;
+                    aspect-ratio: 16 / 9;
+                    background: #111;
+                    border-radius: 12px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+
+                .placeholder {
+                    text-align: center;
+                    color: #aaa;
+                }
+
+                .room {
+                    margin-top: 20px;
+                    padding: 15px;
+                    background: #111;
+                    border-radius: 10px;
+                }
+            </style>
+        </head>
+
+        <body>
+            <div class="container">
+                <h1>🎬 ${escapeHtml(session.title)}</h1>
+
+                <div class="episode">
+                    Episode ${escapeHtml(String(session.episode))}
+                    • ${escapeHtml(session.language.toUpperCase())}
+                </div>
+
+                <div class="player">
+                    <div class="placeholder">
+                        <h2>Meowiee Watch Party</h2>
+                        <p>Video player coming next.</p>
+                    </div>
+                </div>
+
+                <div class="room">
+                    Room:
+                    <strong>${escapeHtml(session.roomId)}</strong>
+                </div>
+            </div>
+        </body>
+        </html>
+    `);
+});
 
     app.get('/health', (req, res) => {
       const dbStatus = this.db?.getStatus?.() || { isDegraded: 'unknown' };
