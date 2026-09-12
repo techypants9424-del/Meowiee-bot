@@ -53,8 +53,15 @@ export default {
                     return;
                 }
 
+                if (resolved.reason === 'embed_not_found') {
+                    await interaction.editReply(
+                        `❌ I found **${animeQuery}** episode **${episode}**, but couldn't find a playable stream.`
+                    );
+                    return;
+                }
+
                 await interaction.editReply(
-                    `❌ I found **${animeQuery}**, but couldn't get a playable embed for episode **${episode}**.`
+                    `❌ I couldn't find a playable version of **${animeQuery}** episode **${episode}**.`
                 );
                 return;
             }
@@ -71,7 +78,7 @@ export default {
 
                 language: resolved.language,
 
-                watchUrl: resolved.embedUrl,
+                embedUrl: resolved.embedUrl,
             });
 
             const port =
@@ -88,11 +95,11 @@ export default {
 
             watchSessions.update(session.roomId, {
                 watchUrl,
-                embedUrl: resolved.embedUrl,
 
-                animeId: resolved.anime.id,
+                animeId: resolved.animeId,
+
                 episodeEmbedId:
-                    resolved.episode.episode_embed_id,
+                    resolved.episode.episode_embed_id ?? null,
             });
 
             await interaction.editReply(
@@ -108,9 +115,11 @@ export default {
                 error
             );
 
-            await interaction.editReply(
-                `❌ Something went wrong while finding **${animeQuery}**.`
-            );
+            if (interaction.deferred || interaction.replied) {
+                await interaction.editReply(
+                    `❌ Something went wrong while finding **${animeQuery}**.`
+                );
+            }
         }
     },
 };
