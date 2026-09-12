@@ -171,11 +171,70 @@ class TitanBot extends Client {
             <!DOCTYPE html>
             <html>
             <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Watch Party Not Found</title>
+                <style>
+                    body {
+                        margin: 0;
+                        background: #080808;
+                        color: white;
+                        font-family: Arial, sans-serif;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        min-height: 100vh;
+                    }
+
+                    .error {
+                        text-align: center;
+                    }
+                </style>
             </head>
             <body>
-                <h1>404</h1>
-                <p>This Meowiee watch party doesn't exist.</p>
+                <div class="error">
+                    <h1>404</h1>
+                    <p>This Meowiee watch party doesn't exist.</p>
+                </div>
+            </body>
+            </html>
+        `);
+    }
+
+    const embedUrl = session.embedUrl;
+
+    if (!embedUrl) {
+        return res.status(500).send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Player Unavailable</title>
+                <style>
+                    body {
+                        margin: 0;
+                        background: #080808;
+                        color: white;
+                        font-family: Arial, sans-serif;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        min-height: 100vh;
+                    }
+
+                    .error {
+                        text-align: center;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="error">
+                    <div>
+                        <h1>❌ Player unavailable</h1>
+                        <p>This episode was found, but AniKoto did not provide a playable embed URL.</p>
+                    </div>
+                </div>
             </body>
             </html>
         `);
@@ -190,9 +249,14 @@ class TitanBot extends Client {
                 name="viewport"
                 content="width=device-width, initial-scale=1.0"
             >
+
             <title>${escapeHtml(session.title)} — Meowiee Watch Party</title>
 
             <style>
+                * {
+                    box-sizing: border-box;
+                }
+
                 body {
                     margin: 0;
                     background: #080808;
@@ -202,45 +266,60 @@ class TitanBot extends Client {
 
                 .container {
                     max-width: 1200px;
-                    margin: 40px auto;
-                    padding: 20px;
+                    margin: 0 auto;
+                    padding: 30px 20px;
                 }
 
                 h1 {
-                    margin-bottom: 5px;
+                    margin: 0 0 8px;
+                    font-size: 28px;
                 }
 
                 .episode {
                     color: #aaa;
-                    margin-bottom: 25px;
+                    margin-bottom: 20px;
                 }
 
                 .player {
                     width: 100%;
                     aspect-ratio: 16 / 9;
-                    background: #111;
+                    background: #000;
                     border-radius: 12px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
+                    overflow: hidden;
+                    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
                 }
 
-                .placeholder {
-                    text-align: center;
-                    color: #aaa;
+                iframe {
+                    width: 100%;
+                    height: 100%;
+                    border: 0;
+                    display: block;
                 }
 
                 .room {
                     margin-top: 20px;
-                    padding: 15px;
+                    padding: 16px;
                     background: #111;
                     border-radius: 10px;
+                    color: #aaa;
+                }
+
+                .room strong {
+                    color: white;
+                }
+
+                .info {
+                    margin-top: 10px;
+                    font-size: 13px;
+                    color: #777;
+                    word-break: break-all;
                 }
             </style>
         </head>
 
         <body>
             <div class="container">
+
                 <h1>🎬 ${escapeHtml(session.title)}</h1>
 
                 <div class="episode">
@@ -249,22 +328,28 @@ class TitanBot extends Client {
                 </div>
 
                 <div class="player">
-                    <div class="placeholder">
-                        <h2>Meowiee Watch Party</h2>
-                        <p>Video player coming next.</p>
-                    </div>
+                    <iframe
+                        src="${escapeHtml(embedUrl)}"
+                        allow="autoplay; fullscreen; picture-in-picture"
+                        allowfullscreen
+                        referrerpolicy="origin"
+                    ></iframe>
                 </div>
 
                 <div class="room">
                     Room:
                     <strong>${escapeHtml(session.roomId)}</strong>
+
+                    <div class="info">
+                        Watch party hosted by Meowiee
+                    </div>
                 </div>
+
             </div>
         </body>
         </html>
     `);
 });
-
     app.get('/health', (req, res) => {
       const dbStatus = this.db?.getStatus?.() || { isDegraded: 'unknown' };
       const status = {
