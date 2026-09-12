@@ -1,62 +1,229 @@
-const API_BASE = 'https://anikotoapi.site';
+const ANIKOTO_API = 'https://anikotoapi.site';
 
-async function apiRequest(path) {
-    const response = await fetch(`${API_BASE}${path}`, {
+async function fetchJson(url) {
+    const response = await fetch(url, {
         headers: {
             Accept: 'application/json',
-            'User-Agent': 'Meowiee Watch Party',
+            'User-Agent': 'Meowiee/WatchParty',
         },
     });
 
     if (!response.ok) {
-        throw new Error(`AniKoto API returned ${response.status}`);
+        throw new Error(
+            `AniKoto API returned ${response.status}`
+        );
     }
 
-    const json = await response.json();
-
-    if (!json?.ok) {
-        throw new Error('AniKoto API returned an unsuccessful response');
-    }
-
-    return json.data;
+    return response.json();
 }
 
+/**
+ * Get a page of AniKoto's anime catalog.
+ */
+export async function getRecentAnime(page = 1, perPage = 100) {
+    const url =
+        `${ANIKOTO_API}/recent-anime` +
+        `?page=${page}&per_page=${perPage}`;
+
+    const data = await fetchJson(url);
+
+    if (!data?.ok || !Array.isArray(data.data)) {
+        throw new Error('Invalid AniKoto catalog response');
+    }
+
+    return data.data;
+}
+
+/**
+ * Get a complete AniKoto series including episodes.
+ */
 export async function getSeries(seriesId) {
-    return apiRequest(`/series/${seriesId}`);
-}
-
-export async function searchAnime(query) {
-    const data = await apiRequest(
-        `/search?q=${encodeURIComponent(query)}`
+    const data = await fetchJson(
+        `${ANIKOTO_API}/series/${encodeURIComponent(seriesId)}`
     );
 
-    return Array.isArray(data) ? data : data?.data ?? [];
+    if (!data?.ok || !data.data?.anime || !Array.isArray(data.data.episodes)) {
+        throw new Error('Invalid AniKoto series response');
+    }
+
+    return data.data;
 }
 
-export async function getEpisode(seriesId, episodeNumber, language = 'sub') {
-    const data = await getSeries(seriesId);
+/**
+ * Find an anime from AniKoto's catalog.
+ *
+ * The official API currently exposes the catalog through
+ * /recent-anime rather than a documented search endpoint.
+ *
+ * We check several catalog pages and score title matches.
+ */
+export async function searchAnime(query, options = {}) {
+    const cleanQuery = String(query || '')
+        .trim()
+        .toLowerCase();
 
-    const episode = data?.episodes?.find(
-        (ep) => Number(ep.number) === Number(episodeNumber)
+    if (!cleanQuery) {
+        return [];
+    }
+
+    const pages = Math.max(
+        1,
+        Math.min(Number(options.pages) || 5, 20)
     );
+
+    const results = [];
+
+    for (let page = 1; page <= pages; page++) {
+        let animeList;
+
+        try {
+            animeList = await getRecentAnime(page, 100);
+        } catch (error) {
+            console.error(
+                `[AniKoto] Failed to load page ${page}:`,
+                error.message
+            );
+            continue;
+        }
+
+        for (const anime of animeList) {
+            const title = String(anime.title || '');
+            const alternative = String(anime.alternative || '');
+            const titles = String(anime.titles || '');
+
+            const haystack = [
+                title,
+                alternative,
+                titles,
+            ]
+                .join(' ')
+                .toLowerCase();
+
+            let score = 0;
+
+            if (title.toLowerCase() === cleanQuery) {
+                score += 100;
+            }
+
+            if (alternative.toLowerCase() === cleanQuery) {
+                score += 90;
+            }
+
+            if (title.toLowerCase().includes(cleanQuery)) {
+                score += 60;
+            }
+
+            if (alternative.toLowerCase().includes(cleanQuery)) {
+                score += 50;
+            }
+
+            if (haystack.includes(cleanQuery)) {
+                score += 20;
+            }
+
+            if (score > 0) {
+                results.push({
+                    ...anime,
+                    _score: score,
+                });
+            }
+        }
+    }
+
+    results.sort((a, b) => b._score - a._score);
+
+    return results;
+}
+
+/**
+ * Find a specific episode in a series.
+ */
+export function findEpisode(series, episodeNumber) {
+    const number = Number(episodeNumber);
+
+    if (!Number.isInteger(number) || number < 1) {
+        return null;
+    }
+
+    return (
+        series.episodes.find(
+            (episode) => Number(episode.number) === number
+        ) || null
+    );
+}
+
+/**
+ * Resolve an anime title + episode into a MegaPlay embed URL.
+ */
+export async function resolveWatchEpisode(
+    animeQuery,
+    episodeNumber = 1,
+    language = 'sub'
+) {
+    const results = await searchAnime(animeQuery);
+
+    if (!results.length) {
+        return {
+            ok: false,
+            reason: 'anime_not_found',
+            results: [],
+        };
+    }
+
+    const anime = results[0];
+
+    const series = await getSeries(anime.id);
+
+    const episode = findEpisode(series, episodeNumber);
 
     if (!episode) {
-        throw new Error(
-            `Episode ${episodeNumber} was not found for this anime`
-        );
+        return {
+            ok: false,
+            reason: 'episode_not_found',
+            anime,
+            series,
+            results,
+        };
     }
 
-    const embedUrl = episode?.embed_url?.[language];
+    const embedUrl =
+        episode.embed_url?.[language] ||
+        episode.embed_url?.sub ||
+        episode.embed_url?.dub ||
+        null;
 
     if (!embedUrl) {
-        throw new Error(
-            `No ${language} stream is available for episode ${episodeNumber}`
-        );
+        return {
+            ok: false,
+            reason: 'embed_not_found',
+            anime,
+            series,
+            episode,
+            results,
+        };
     }
 
     return {
-        anime: data.anime,
+        ok: true,
+
+        anime: series.anime,
+
         episode,
+
+        episodeNumber: episode.number,
+
+        language,
+
         embedUrl,
+
+        searchResults: results.slice(0, 5),
     };
 }
+
+export default {
+    getRecentAnime,
+    getSeries,
+    searchAnime,
+    findEpisode,
+    resolveWatchEpisode,
+};
