@@ -1,4 +1,3 @@
-```js
 const ANIKOTO_API = 'https://anikoto-api.onrender.com';
 
 async function fetchJson(url) {
@@ -47,8 +46,8 @@ export async function getAnimeInfo(slug) {
 /**
  * Get numeric AniKoto anime ID.
  *
- * The documented /page endpoint currently returns an empty
- * response on the live API, so this is kept defensive.
+ * Example:
+ * /page?name=naruto-shippuden-c8gov
  */
 export async function getAnimeId(slug) {
     if (!slug) {
@@ -105,6 +104,9 @@ export async function getEpisodes(animeId) {
     return Array.isArray(data) ? data : [];
 }
 
+/**
+ * Find a specific episode.
+ */
 export function findEpisode(episodes, episodeNumber) {
     const number = Number(episodeNumber);
 
@@ -120,12 +122,11 @@ export function findEpisode(episodes, episodeNumber) {
 }
 
 /**
- * Turn:
+ * Convert an anime title into a basic slug.
  *
+ * Example:
  * Naruto Shippuden
- *
- * into:
- *
+ * ->
  * naruto-shippuden
  */
 function normalizeSlug(value) {
@@ -138,11 +139,7 @@ function normalizeSlug(value) {
 }
 
 /**
- * Try an AniKoto slug.
- *
- * IMPORTANT:
- * We do NOT throw on a 404 here.
- * A 404 simply means this guessed slug doesn't exist.
+ * Try AniKoto /info without crashing on a 404.
  */
 async function tryInfo(slug) {
     try {
@@ -157,9 +154,59 @@ async function tryInfo(slug) {
 }
 
 /**
- * Resolve anime + episode.
+ * Build the MegaPlay embed URL.
  *
- * This accepts either:
+ * Newer AniKoto responses can contain:
+ *
+ * episode_embed_id
+ *
+ * Current AniKoto API responses instead give us:
+ *
+ * malid
+ * num
+ *
+ * MegaPlay supports both formats.
+ */
+function buildEmbedUrl(episode, language = 'sub') {
+    const lang = language === 'dub'
+        ? 'dub'
+        : 'sub';
+
+    /*
+     * Preferred method:
+     * AniKoto episode_embed_id
+     */
+    if (episode?.episode_embed_id) {
+        return (
+            `https://megaplay.buzz/stream/s-2/` +
+            `${encodeURIComponent(episode.episode_embed_id)}/` +
+            `${lang}`
+        );
+    }
+
+    /*
+     * Current AniKoto API:
+     * use MAL ID + episode number.
+     *
+     * Example:
+     * https://megaplay.buzz/stream/mal/1735/1/sub
+     */
+    if (episode?.malid && episode?.num) {
+        return (
+            `https://megaplay.buzz/stream/mal/` +
+            `${encodeURIComponent(episode.malid)}/` +
+            `${encodeURIComponent(episode.num)}/` +
+            `${lang}`
+        );
+    }
+
+    return null;
+}
+
+/**
+ * Resolve anime + episode + playable embed.
+ *
+ * Accepts:
  *
  * naruto-shippuden-c8gov
  *
@@ -186,18 +233,15 @@ export async function resolveWatchEpisode(
     );
 
     /*
-     * First assume the user supplied an AniKoto slug.
+     * First treat the query as an AniKoto slug.
      */
     let slug = normalizeSlug(query);
 
     let anime = await tryInfo(slug);
 
     /*
-     * If that failed, we currently don't have a search endpoint
-     * from the documented API.
-     *
-     * HOWEVER, some AniKoto queries may already contain the
-     * actual slug, so try the original value as-is too.
+     * If the normalized slug failed,
+     * try the original query too.
      */
     if (!anime && query !== slug) {
         anime = await tryInfo(query);
@@ -220,8 +264,7 @@ export async function resolveWatchEpisode(
     );
 
     /*
-     * The API docs say /page converts the slug into
-     * the numeric ID required by /episodes.
+     * Get the numeric AniKoto ID.
      */
     const animeId = await getAnimeId(slug);
 
@@ -242,9 +285,16 @@ export async function resolveWatchEpisode(
         `[Watch] AniKoto numeric ID: ${animeId}`
     );
 
+    /*
+     * Get all episodes.
+     */
     const episodes = await getEpisodes(animeId);
 
     if (!episodes.length) {
+        console.log(
+            `[Watch] No episodes found for AniKoto ID ${animeId}`
+        );
+
         return {
             ok: false,
             reason: 'episodes_not_found',
@@ -254,12 +304,19 @@ export async function resolveWatchEpisode(
         };
     }
 
+    /*
+     * Find requested episode.
+     */
     const episode = findEpisode(
         episodes,
         episodeNumber
     );
 
     if (!episode) {
+        console.log(
+            `[Watch] Episode ${episodeNumber} not found`
+        );
+
         return {
             ok: false,
             reason: 'episode_not_found',
@@ -270,31 +327,55 @@ export async function resolveWatchEpisode(
         };
     }
 
+    console.log(
+        `[Watch] Found episode ${episode.num}: ${episode.title || 'Untitled'}`
+    );
+
     /*
-     * IMPORTANT:
-     *
-     * /episodes currently gives us metadata such as:
-     *
-     * num
-     * malid
-     * title
-     * data_id
-     * slug
-     * timestamp
-     *
-     * It does NOT give us an embed URL.
-     *
-     * So we return the raw episode data for the next
-     * watch-player resolution step.
+     * Build playable MegaPlay embed URL.
      */
+    const embedUrl = buildEmbedUrl(
+        episode,
+        language
+    );
+
+    if (!embedUrl) {
+        console.log(
+            `[Watch] Could not create an embed URL for episode ${episodeNumber}`
+        );
+
+        return {
+            ok: false,
+            reason: 'embed_not_found',
+            anime,
+            animeId,
+            episode,
+            episodes,
+            slug,
+        };
+    }
+
+    console.log(
+        `[Watch] Embed URL: ${embedUrl}`
+    );
+
     return {
         ok: true,
+
         anime,
+
         animeId,
+
         slug,
+
         episode,
+
         episodeNumber: Number(episode.num),
+
         language,
+
+        embedUrl,
+
         episodes,
     };
 }
@@ -306,4 +387,3 @@ export default {
     findEpisode,
     resolveWatchEpisode,
 };
-```
