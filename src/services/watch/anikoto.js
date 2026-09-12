@@ -172,10 +172,7 @@ function buildEmbedUrl(episode, language = 'sub') {
         ? 'dub'
         : 'sub';
 
-    /*
-     * Preferred method:
-     * AniKoto episode_embed_id
-     */
+    // Preferred: newer AniKoto API
     if (episode?.episode_embed_id) {
         return (
             `https://megaplay.buzz/stream/s-2/` +
@@ -184,13 +181,7 @@ function buildEmbedUrl(episode, language = 'sub') {
         );
     }
 
-    /*
-     * Current AniKoto API:
-     * use MAL ID + episode number.
-     *
-     * Example:
-     * https://megaplay.buzz/stream/mal/1735/1/sub
-     */
+    // Current AniKoto API
     if (episode?.malid && episode?.num) {
         return (
             `https://megaplay.buzz/stream/mal/` +
